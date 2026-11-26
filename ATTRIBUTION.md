@@ -17,10 +17,24 @@ the site says so on every case's debrief.
 Every case shows its authors, title, journal, year, DOI, a link to the original article, and its licence.
 Per-case metadata is in `site/data/cases/<ward>.json` under `src`.
 
+## Figures
+
+Images are each article's own published figures. They are loaded directly from the **PMC Open Access
+cloud bucket** (`pmc-oa-opendata`, AWS Open Data Sponsorship Program, NIH/NLM) and fall under the same per-article
+CC BY / CC0 licence as the text. Each figure is shown with its caption (where the caption and image can be paired
+exactly), the authors, the journal and the licence.
+
 ## Medicines
 
-Medicine names link to **DailyMed** (US National Library of Medicine), which publishes official drug labels
-(public domain, US government work). The site does not copy label text.
+Pharmacist cards quote **openFDA drug label** data (US FDA, public domain / CC0, open.fda.gov/terms) verbatim:
+pharmacologic class, mechanism of action, indications, boxed warning, contraindications, most common adverse
+reactions, drug interactions and pregnancy. Only the first sentences of each section are kept, and each card
+links to the full label on **DailyMed** (US National Library of Medicine) by its set id.
+
+## On-device camera mode (optional)
+
+The optional "notice when I look away" camera mode uses MediaPipe Tasks Vision (Apache-2.0, Google), loaded from
+jsDelivr, with the BlazeFace short-range model. It runs entirely in the browser; no image leaves the device.
 
 ## Fonts
 

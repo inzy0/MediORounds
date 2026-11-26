@@ -2,74 +2,96 @@
 
 Free, live, voice-first ward rounds for MBBS students, built on real published case reports.
 
-A student takes a bed, talks to the patient (voice or text), examines, orders tests, commits a diagnosis and a
-plan, then follows the admission day by day with a senior. When complications appear, they are asked what they
-would do. The case ends with an HOD teaching round and a score card.
+A student takes a bed and talks to the patient (voice or text). They examine, order tests (and see the
+published images), and commit a diagnosis and a plan. Then they round on the admission day by day with the
+whole team: senior resident, nurse, radiologist, pathologist, surgeon, neurologist, physiotherapist,
+intensivist, obstetrician, paediatrician, psychiatrist, dietitian and clinical pharmacist. Each specialist
+then asks the student one question. The case ends with an HOD teaching round, a quiz that corrects mistakes,
+a "what did you learn?" reflection and a score card.
 
-- **3,000 cases across 10 wards:** General Medicine, General Surgery, Obstetrics & Gynaecology, Paediatrics,
-  Orthopaedics, Emergency & ICU, Psychiatry, ENT, Ophthalmology, Dermatology. The builder scales to more.
+- **About 15,000 cases in 15 wards:** General Medicine, ICU & Critical Care, Emergency & Casualty, General
+  Surgery, Neurology & Neurosurgery, Obstetrics & Gynaecology, Paediatrics & Neonatology, Orthopaedics,
+  Physiotherapy & Rehab Centre, Clinical Pharmacology & Toxicology, Psychiatry, ENT, Ophthalmology,
+  Dermatology, and Unique & Rare Cases.
+- **Multidisciplinary Ward:** 1,000 cases where 3 or more specialties (surgeon, neuro, physio, ICU and others)
+  each have part of the story, for holistic, team-based reasoning.
+- **Published figures:** the article's own images (X-ray, CT, MRI, histology and others), shown when the
+  matching test is ordered.
+- **Pharmacist cards:** for every medicine named, the official label's class, mechanism, indications, boxed
+  warning, contraindications, adverse reactions, interactions and pregnancy information, quoted.
 - **7 languages:** English, Hindi, Marathi, Tamil, Telugu, Kannada, Malayalam.
-- **Fully free, fully cloud:** a static site on GitHub Pages. No server, no API keys, no usage limits, and nothing
-  runs on the owner's PC.
+- **Fully free, fully cloud:** a static site on GitHub Pages. No server, no API keys, no usage limits.
+
+## Learning features
+
+| Feature | What it does |
+|---|---|
+| Learning objectives | Shown at the start of each case, built from what the case contains |
+| Live voice | Hands-free listen → reply → listen loop. Interrupt by tapping, or by speaking (barge-in, headphones advised) |
+| Team voices | Each role speaks in its own voice where the device has several |
+| Look-away rule | Away for 5 seconds (tab hidden, window unfocused, or no face seen in the optional on-device camera mode): pause the audio, or keep it going |
+| Hints and ideas | Three-level hints from the senior. The classmate offers an idea when you go quiet in live mode. |
+| Team review | Each specialist asks one question, then shows what the case says from their side |
+| Quiz with correction | Multiple choice: the published diagnosis against real titles of other cases, plus fill-the-gap questions on medicines and tests using the case's own sentences. Wrong answers show the source sentence. |
+| Reflection | "What did you learn?" is matched against the article's teaching points; you see what you caught and one point to take away |
+| Memory | XP and levels (Intern to Professor), 13 badges, a streak, per-skill and per-ward progress, a reflection journal, and a spaced-repetition review deck of missed questions (1, 3, 7, 14, 30 days). All stored in the browser, with CSV export. |
+| Resources | Full article, PDF, PubMed similar cases, MedlinePlus, NCBI Bookshelf, Open-i images, Wikimedia Commons images and videos, ClinicalTrials.gov |
 
 ## How it stays accurate, and the same every time
 
 Nothing about a patient is generated. Each case is the published article's own case text, split into ward-round
 stages. The article's own section headings are used where it has them; otherwise fixed keyword rules decide.
-When a student asks a question, the engine finds the sentence in the case record that answers it and returns it
-word for word. If the record doesn't cover the question, the student is told so. The same question on the same
-case always gets the same answer.
+A question gets the sentence from the case record that answers it, word for word, in the voice of the team
+member it belongs to. If the record doesn't cover the question, the student is told so. The same question on
+the same case always gets the same answer.
 
 | Piece | Source |
 |---|---|
 | History, examination, results, course, outcome | The case report's own text (verbatim) |
-| Differential diagnosis shown after the student commits | The report's own "Differential diagnosis" section, where it has one |
+| Images | The article's own figures (PMC Open Access cloud bucket) |
+| Differential diagnosis after the student commits | The report's own "Differential diagnosis" section, where it has one |
 | HOD teaching points | The report's "Learning points" section, or the sentences in its Discussion that state a lesson |
-| Medicines | Names found in the case, linked to the official label on DailyMed. Doses are only what the case states. |
-| Senior / HOD prompts | Fixed teaching prompts (no clinical facts) |
+| Medicines | Official US drug labels (openFDA, public domain), first sentences of each section, linked to DailyMed |
+| Senior / team / classmate prompts | Fixed teaching prompts, with no clinical facts in them |
+| Quiz | Stems are the case's own sentences. Distractors are real names from the label set or real titles of other cases. |
 
-Scores measure how much of the case was uncovered and include the student's own ratings. They are a practice
-guide, not a validated assessment.
+Scores are coverage counts, quiz results and the student's own ratings. They are a practice guide, not a
+validated assessment.
 
 ## Voice and languages: what each browser does
 
 | Feature | Uses | Works best in |
 |---|---|---|
 | Speech input (all 7 languages) | Web Speech API `SpeechRecognition` | Chrome, Edge (desktop + Android) |
-| Spoken replies | Web Speech API `speechSynthesis` with the device's voices | Any modern browser. Indian-language voices depend on what the device has installed. |
+| Spoken replies | Web Speech API `speechSynthesis` with the device's voices | Any modern browser. Indian-language voices depend on the device. |
 | Translation of case text and student speech | Built-in on-device `Translator` API | Recent desktop Chrome / Edge |
-| Live hands-free mode | Listen → reply → listen again; tap the orb to interrupt | Chrome, Edge |
+| Camera look-away detection (optional) | MediaPipe face detector, on-device | Chrome, Edge, Firefox |
 
-If a browser has no on-device translator, the site says so. Speech input still works in the chosen language and
-replies stay in English. The original English is always one tap away. A translation whose numbers differ from
-the English is flagged, so a dose or lab value is never silently changed.
+The original English is always one tap away. A translation whose numbers differ from the English is flagged.
 
 ## Layout
 
 ```
-site/                 the website (deployed as-is)
-  index.html, css/, js/
-  data/wards.json     ward index
-  data/cases/*.json   case bank, one file per ward
-build/build_casebank.py   builds site/data from the PMC Open Access library
-tests/engine.test.mjs     runs every case through a scripted round (CI)
-tests/e2e.mjs             drives a full case in headless Chromium
-.github/workflows/pages.yml   test, then deploy to GitHub Pages
+site/                       the website (deployed as-is)
+  js/engine.js              case engine (retrieval, stages, routing)
+  js/teach.js               objectives, team speakers, quiz, reflection, figures, resources
+  js/voice.js               speech in/out, live mode, barge-in, look-away rule, camera presence
+  js/app.js                 UI, phases, XP/badges, review deck
+  data/wards.json           ward list
+  data/cases/<ward>/        index.json + shards of 100 cases
+  data/drugs.json           pharmacist label cards
+build/build_casebank.py     case bank from the PMC OA library
+build/add_figures.py        figure lists from the PMC OA cloud bucket
+build/build_drugs.py        label cards from the openFDA bulk download
+tests/engine.test.mjs       every case through a scripted round + teaching layer (CI)
+tests/e2e.mjs               a full case in headless Chromium
 ```
 
 ## Deploy
 
-1. On GitHub, open **Settings → Pages → Build and deployment → Source** and choose **GitHub Actions**.
-2. Push to `main`. The workflow runs the engine test on every case and then publishes `site/`.
-3. The site goes live at `https://<user>.github.io/MediORounds/`.
-
-Local preview: `python -m http.server 8000 --directory site`, then open http://127.0.0.1:8000.
-
-## Rebuilding the case bank
-
-`build/build_casebank.py --library <PMC OA library> --per-ward 300` reads a local copy of the PMC Open Access
-case reports and keeps human cases only, under licence CC BY or CC0, not retracted, from 2015 onwards. Single cases only, each with an age
-in its opening lines and both investigations and management in the text. Output is deterministic.
+Pushing to `main` runs the engine test on every case. The site is served by GitHub Pages at
+`https://<user>.github.io/MediORounds/`. To make deploys wait for the tests, set **Settings → Pages → Source** to
+**GitHub Actions**. Local preview: `python -m http.server 8000 --directory site`.
 
 ## Not for patient care
 

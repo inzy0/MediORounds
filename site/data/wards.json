@@ -1,9 +1,36 @@
 {
  "wards": [
   {
+   "id": "mdt",
+   "name": "Multidisciplinary Ward",
+   "blurb": "One patient, many specialists: physician, surgeon, neuro, physio, ICU and more",
+   "count": 1000,
+   "shards": 10,
+   "collection": true,
+   "subs": [
+    "dermatology",
+    "emergency",
+    "ent",
+    "icu",
+    "medicine",
+    "neurology",
+    "obg",
+    "ophthalmology",
+    "ortho",
+    "paeds",
+    "pharmacology",
+    "psychiatry",
+    "rehab",
+    "surgery",
+    "unique"
+   ]
+  },
+  {
    "id": "medicine",
    "name": "General Medicine",
-   "count": 300,
+   "blurb": "Cardio, chest, GI, renal, endocrine, infection, blood",
+   "count": 1000,
+   "shards": 10,
    "subs": [
     "cardiology",
     "endocrinology_metabolism",
@@ -13,62 +40,15 @@
     "immunology_rheumatology",
     "infectious_disease",
     "nephrology_urology",
-    "neurology",
     "respiratory"
    ]
   },
   {
-   "id": "surgery",
-   "name": "General Surgery",
-   "count": 300,
-   "subs": [
-    "surgery_anesthesia"
-   ]
-  },
-  {
-   "id": "obg",
-   "name": "Obstetrics & Gynaecology",
-   "count": 300,
-   "subs": [
-    "obstetrics_gynecology"
-   ]
-  },
-  {
-   "id": "paeds",
-   "name": "Paediatrics",
-   "count": 300,
-   "subs": [
-    "pediatrics_neonatal"
-   ]
-  },
-  {
-   "id": "ortho",
-   "name": "Orthopaedics",
-   "count": 300,
-   "subs": [
-    "musculoskeletal_orthopedics"
-   ]
-  },
-  {
-   "id": "emergency",
-   "name": "Emergency & ICU",
-   "count": 300,
-   "subs": [
-    "emergency_critical_care"
-   ]
-  },
-  {
-   "id": "psychiatry",
-   "name": "Psychiatry",
-   "count": 300,
-   "subs": [
-    "mental_health"
-   ]
-  },
-  {
-   "id": "ent",
-   "name": "ENT",
-   "count": 300,
+   "id": "icu",
+   "name": "ICU & Critical Care",
+   "blurb": "Shock, sepsis, ventilation, arrest",
+   "count": 1000,
+   "shards": 10,
    "subs": [
     "cardiology",
     "dentistry_oral",
@@ -99,9 +79,180 @@
    ]
   },
   {
+   "id": "emergency",
+   "name": "Emergency & Casualty",
+   "blurb": "Triage, trauma, acute presentations",
+   "count": 1000,
+   "shards": 10,
+   "subs": [
+    "emergency_critical_care"
+   ]
+  },
+  {
+   "id": "surgery",
+   "name": "General Surgery",
+   "blurb": "Acute abdomen, tumours, post-op care",
+   "count": 1000,
+   "shards": 10,
+   "subs": [
+    "oncology",
+    "surgery_anesthesia"
+   ]
+  },
+  {
+   "id": "neurology",
+   "name": "Neurology & Neurosurgery",
+   "blurb": "Stroke, seizures, spine, nerve, brain",
+   "count": 1000,
+   "shards": 10,
+   "subs": [
+    "neurology"
+   ]
+  },
+  {
+   "id": "obg",
+   "name": "Obstetrics & Gynaecology",
+   "blurb": "Pregnancy, labour, gynae emergencies",
+   "count": 1000,
+   "shards": 10,
+   "subs": [
+    "obstetrics_gynecology"
+   ]
+  },
+  {
+   "id": "paeds",
+   "name": "Paediatrics & Neonatology",
+   "blurb": "Newborns to adolescents",
+   "count": 1000,
+   "shards": 10,
+   "subs": [
+    "pediatrics_neonatal"
+   ]
+  },
+  {
+   "id": "ortho",
+   "name": "Orthopaedics",
+   "blurb": "Fractures, joints, bone infection",
+   "count": 1000,
+   "shards": 10,
+   "subs": [
+    "musculoskeletal_orthopedics"
+   ]
+  },
+  {
+   "id": "rehab",
+   "name": "Physiotherapy & Rehab Centre",
+   "blurb": "Recovery, function, sports injury, rehab goals",
+   "count": 977,
+   "shards": 10,
+   "subs": [
+    "cardiology",
+    "dentistry_oral",
+    "dermatology",
+    "emergency_critical_care",
+    "gastroenterology_hepatology",
+    "genetics_genomics",
+    "hematology",
+    "immunology_rheumatology",
+    "infectious_disease",
+    "mental_health",
+    "musculoskeletal_orthopedics",
+    "nephrology_urology",
+    "neurology",
+    "nutrition",
+    "obstetrics_gynecology",
+    "oncology",
+    "ophthalmology",
+    "pediatrics_neonatal",
+    "rehabilitation_sports_exercise",
+    "respiratory",
+    "surgery_anesthesia"
+   ]
+  },
+  {
+   "id": "pharmacology",
+   "name": "Clinical Pharmacology & Toxicology",
+   "blurb": "Adverse reactions, poisoning, interactions",
+   "count": 1000,
+   "shards": 10,
+   "subs": [
+    "cardiology",
+    "dentistry_oral",
+    "dermatology",
+    "emergency_critical_care",
+    "endocrinology_metabolism",
+    "gastroenterology_hepatology",
+    "general_medicine",
+    "genetics_genomics",
+    "health_services_education",
+    "hematology",
+    "immunology_rheumatology",
+    "infectious_disease",
+    "mental_health",
+    "musculoskeletal_orthopedics",
+    "nephrology_urology",
+    "neurology",
+    "nutrition",
+    "obstetrics_gynecology",
+    "oncology",
+    "ophthalmology",
+    "pediatrics_neonatal",
+    "pharmacology",
+    "public_health_epidemiology",
+    "respiratory",
+    "surgery_anesthesia"
+   ]
+  },
+  {
+   "id": "psychiatry",
+   "name": "Psychiatry",
+   "blurb": "Mood, psychosis, substance use, risk",
+   "count": 1000,
+   "shards": 10,
+   "subs": [
+    "mental_health"
+   ]
+  },
+  {
+   "id": "ent",
+   "name": "ENT",
+   "blurb": "Ear, nose, throat, head and neck",
+   "count": 1000,
+   "shards": 10,
+   "subs": [
+    "cardiology",
+    "dentistry_oral",
+    "dermatology",
+    "emergency_critical_care",
+    "endocrinology_metabolism",
+    "gastroenterology_hepatology",
+    "general_medicine",
+    "genetics_genomics",
+    "health_services_education",
+    "hematology",
+    "immunology_rheumatology",
+    "infectious_disease",
+    "mental_health",
+    "musculoskeletal_orthopedics",
+    "nephrology_urology",
+    "neurology",
+    "nutrition",
+    "obstetrics_gynecology",
+    "oncology",
+    "ophthalmology",
+    "pediatrics_neonatal",
+    "pharmacology",
+    "public_health_epidemiology",
+    "respiratory",
+    "surgery_anesthesia"
+   ]
+  },
+  {
    "id": "ophthalmology",
    "name": "Ophthalmology",
-   "count": 300,
+   "blurb": "Red eye, vision loss, retina",
+   "count": 1000,
+   "shards": 10,
    "subs": [
     "ophthalmology"
    ]
@@ -109,13 +260,49 @@
   {
    "id": "dermatology",
    "name": "Dermatology",
-   "count": 300,
+   "blurb": "Rashes, lesions, skin signs of disease",
+   "count": 1000,
+   "shards": 10,
    "subs": [
     "dermatology"
    ]
+  },
+  {
+   "id": "unique",
+   "name": "Unique & Rare Cases",
+   "blurb": "First reports and zebras",
+   "count": 1000,
+   "shards": 10,
+   "subs": [
+    "cardiology",
+    "dentistry_oral",
+    "emergency_critical_care",
+    "endocrinology_metabolism",
+    "gastroenterology_hepatology",
+    "general_medicine",
+    "genetics_genomics",
+    "health_services_education",
+    "hematology",
+    "immunology_rheumatology",
+    "infectious_disease",
+    "mental_health",
+    "musculoskeletal_orthopedics",
+    "nephrology_urology",
+    "neurology",
+    "nutrition",
+    "obstetrics_gynecology",
+    "oncology",
+    "ophthalmology",
+    "pharmacology",
+    "public_health_epidemiology",
+    "respiratory",
+    "surgery_anesthesia"
+   ]
   }
  ],
- "total": 3000,
+ "total": 14977,
+ "shard": 100,
  "source": "PMC Open Access Subset (NIH/NLM), CC BY / CC0 case reports, verbatim",
- "min_year": "2015"
+ "figures": "PMC Open Access cloud bucket (pmc-oa-opendata, AWS Open Data)",
+ "min_year": "2012"
 }

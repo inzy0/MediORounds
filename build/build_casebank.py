@@ -10,7 +10,7 @@ CC0 are kept (NC excluded so the site may be used freely; SA/ND excluded because
 rearrangement). Every case carries its citation, DOI, PMC link and licence.
 
 Usage:  python build_casebank.py --library <path to PMC OA library> --per-ward 300
-Output: ../site/data/wards.json and ../site/data/cases/<ward>.json
+Output: ../site/data/wards.json and ../site/data/cases/<ward>/{index,0,1,...}.json
 """
 from __future__ import annotations
 
@@ -25,23 +25,58 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 OUT = HERE.parent / "site" / "data"
 
-# ---- wards (MBBS clinical postings) -> library domains --------------------------------------------
+# ---- wards (MBBS clinical postings + units) -> library domains / title rules ----------------------
 ENT_RX = re.compile(r"\b(otitis|tonsil\w*|laryn\w*|pharyn\w*|sinus(itis)?|nasal|nose|epistaxis|cholesteatoma|"
                     r"parotid|ear|hearing|vertigo|mastoid\w*|adenoid\w*|vocal cord|thyroglossal|sinonasal)\b", re.I)
+ICU_RX = re.compile(r"\b(intensive care|icu|critical(ly)? (care|ill)|septic shock|sepsis|ards|acute respiratory distress|"
+                    r"mechanical ventilation|ventilator|ecmo|extracorporeal|cardiac arrest|multi-?organ (failure|dysfunction)|"
+                    r"refractory shock|cardiogenic shock|status epilepticus|resuscitat\w+)\b", re.I)
+REHAB_RX = re.compile(r"\b(rehabilitat\w+|physiotherap\w+|physical therap\w+|exercise therap\w+|occupational therap\w+|"
+                      r"gait|mobili[sz]ation|functional recovery|sports injur\w+|athlete)\b", re.I)
+PHARM_RX = re.compile(r"\b(toxicity|poisoning|overdose|intoxication|adverse (drug )?(reaction|event)|drug[- ]induced|"
+                      r"induced by|-induced|drug reaction|dress syndrome|serotonin syndrome|neuroleptic malignant|"
+                      r"anaphyla\w+|drug interaction|envenomation|snake ?bite)\b", re.I)
+UNIQUE_RX = re.compile(r"\b(rare|first (reported )?(case|report)|unusual|unique|novel|extremely|exceptional|"
+                       r"never (been )?reported|unprecedented|atypical|uncommon)\b", re.I)
 WARDS = [
     {"id": "medicine", "name": "General Medicine", "domains": ["general_medicine", "cardiology", "respiratory",
      "gastroenterology_hepatology", "nephrology_urology", "endocrinology_metabolism", "infectious_disease",
-     "hematology", "neurology", "immunology_rheumatology"]},
-    {"id": "surgery", "name": "General Surgery", "domains": ["surgery_anesthesia"]},
-    {"id": "obg", "name": "Obstetrics & Gynaecology", "domains": ["obstetrics_gynecology"]},
-    {"id": "paeds", "name": "Paediatrics", "domains": ["pediatrics_neonatal"]},
-    {"id": "ortho", "name": "Orthopaedics", "domains": ["musculoskeletal_orthopedics"]},
-    {"id": "emergency", "name": "Emergency & ICU", "domains": ["emergency_critical_care"]},
-    {"id": "psychiatry", "name": "Psychiatry", "domains": ["mental_health"]},
-    {"id": "ent", "name": "ENT", "domains": None, "title_rx": ENT_RX},
-    {"id": "ophthalmology", "name": "Ophthalmology", "domains": ["ophthalmology"]},
-    {"id": "dermatology", "name": "Dermatology", "domains": ["dermatology"]},
+     "hematology", "immunology_rheumatology"], "blurb": "Cardio, chest, GI, renal, endocrine, infection, blood"},
+    {"id": "icu", "name": "ICU & Critical Care", "domains": None, "title_rx": ICU_RX, "blurb": "Shock, sepsis, ventilation, arrest"},
+    {"id": "emergency", "name": "Emergency & Casualty", "domains": ["emergency_critical_care"], "blurb": "Triage, trauma, acute presentations"},
+    {"id": "surgery", "name": "General Surgery", "domains": ["surgery_anesthesia", "oncology"], "blurb": "Acute abdomen, tumours, post-op care"},
+    {"id": "neurology", "name": "Neurology & Neurosurgery", "domains": ["neurology"], "blurb": "Stroke, seizures, spine, nerve, brain"},
+    {"id": "obg", "name": "Obstetrics & Gynaecology", "domains": ["obstetrics_gynecology"], "blurb": "Pregnancy, labour, gynae emergencies"},
+    {"id": "paeds", "name": "Paediatrics & Neonatology", "domains": ["pediatrics_neonatal"], "blurb": "Newborns to adolescents"},
+    {"id": "ortho", "name": "Orthopaedics", "domains": ["musculoskeletal_orthopedics"], "blurb": "Fractures, joints, bone infection"},
+    {"id": "rehab", "name": "Physiotherapy & Rehab Centre", "domains": None, "title_rx": REHAB_RX,
+     "extra_domains": ["rehabilitation_sports_exercise"], "blurb": "Recovery, function, sports injury, rehab goals"},
+    {"id": "pharmacology", "name": "Clinical Pharmacology & Toxicology", "domains": None, "title_rx": PHARM_RX,
+     "extra_domains": ["pharmacology"], "blurb": "Adverse reactions, poisoning, interactions"},
+    {"id": "psychiatry", "name": "Psychiatry", "domains": ["mental_health"], "blurb": "Mood, psychosis, substance use, risk"},
+    {"id": "ent", "name": "ENT", "domains": None, "title_rx": ENT_RX, "blurb": "Ear, nose, throat, head and neck"},
+    {"id": "ophthalmology", "name": "Ophthalmology", "domains": ["ophthalmology"], "blurb": "Red eye, vision loss, retina"},
+    {"id": "dermatology", "name": "Dermatology", "domains": ["dermatology"], "blurb": "Rashes, lesions, skin signs of disease"},
+    {"id": "unique", "name": "Unique & Rare Cases", "domains": None, "title_rx": UNIQUE_RX, "blurb": "First reports and zebras"},
 ]
+MDT_WARD = {"id": "mdt", "name": "Multidisciplinary Ward",
+            "blurb": "One patient, many specialists: physician, surgeon, neuro, physio, ICU and more"}
+
+# ---- specialist voices: which team member speaks to which sentence ---------------------------------
+SPECIALTIES = {
+    "surgeon": r"surg\w+|operat\w+|resect\w+|excis\w+|laparotom\w+|laparoscop\w+|incision|anastomos\w+|debrid\w+|amputat\w+|graft\w*|fixation|arthroplast\w+|craniotom\w+|appendectom\w+|cholecystectom\w+|stoma|drainage",
+    "neurologist": r"neurolog\w+|seizure\w*|stroke|hemipares\w+|paralys\w+|numbness|paresthes\w+|aphasi\w+|dysarthri\w+|ataxi\w+|reflex\w*|cranial nerve|gcs|glasgow|consciousness|encephal\w+|mening\w+|neuropath\w+|myelopath\w+|eeg|nerve conduction|spinal cord|cognitive",
+    "physiotherapist": r"physiotherap\w+|physical therap\w+|rehabilitat\w+|mobili[sz]\w+|exercise\w*|gait|ambulat\w+|range of motion|strengthening|occupational therap\w+|walking|brace|orthos[ie]s|splint\w*|muscle strength|activities of daily living|wheelchair|functional",
+    "intensivist": r"intensive care|icu|ventilat\w+|intubat\w+|vasopressor\w*|noradrenaline|norepinephrine|shock|sepsis|septic|ecmo|dialysis|haemofiltration|hemofiltration|resuscitat\w+|cardiac arrest|cpr|sofa",
+    "radiologist": r"x-ray|radiograph\w*|ct|computed tomograph\w*|mri|magnetic resonance|ultraso\w+|sonograph\w*|angiogra\w+|pet|doppler",
+    "pathologist": r"biops\w+|histolog\w+|histopatholog\w+|cytolog\w+|immunohisto\w+|patholog\w+|smear|stain\w*|culture\w*",
+    "psychiatrist": r"psychiatr\w+|depress\w+|anxiety|psychos[ie]s|psychotic|hallucinat\w+|delusion\w*|suicid\w+|bipolar|schizophren\w+|self-harm",
+    "obstetrician": r"pregnan\w+|gestation\w*|trimester|labou?r|caesarean|cesarean|obstetric\w*|fetal|foetal|postpartum|antenatal|uterus|uterine",
+    "paediatrician": r"infant\w*|neonat\w+|newborn|toddler|paediatric|pediatric|milestone\w*|preterm",
+    "dietitian": r"nutrition\w*|diet\w*|feeding|enteral|parenteral|malnutrition|weight loss|tube feed\w*",
+}
+SPEC_RX = {k: re.compile(r"\b(" + v + r")\b", re.I) for k, v in SPECIALTIES.items()}
+MDT_CORE = {"surgeon", "neurologist", "physiotherapist", "intensivist", "psychiatrist", "obstetrician", "paediatrician", "dietitian"}
 
 # ---- filters --------------------------------------------------------------------------------------
 ANIMAL_RX = re.compile(r"\b(calf|calves|cattle|bovine|canine|dog|dogs|cat|cats|feline|horse|equine|mice|mouse|"
@@ -301,25 +336,92 @@ def demographics(first: str) -> dict:
     return {"age": age.group(0) if age else "", "sex": sex}
 
 
-def build(library: Path, per_ward: int, min_year: str) -> None:
+FIG_CAP_RX = re.compile(r"^- \*\*(Fig(?:ure)?\.?\s*\d+[A-Za-z]?)[:.]?\*\*:?\s*(.*)$", re.I | re.M)
+IMG_EXT = (".jpg", ".jpeg", ".png")
+S3 = "https://pmc-oa-opendata.s3.amazonaws.com"
+
+
+def figure_captions(md: str) -> list[tuple[str, str]]:
+    sect = md.split("## Figure captions", 1)
+    if len(sect) < 2:
+        return []
+    body = re.split(r"\n## ", sect[1], 1)[0]
+    return [(m.group(1), clean(m.group(2))[:400]) for m in FIG_CAP_RX.finditer(body)]
+
+
+def natkey(k: str):
+    return [int(t) if t.isdigit() else t for t in re.split(r"(\d+)", k.lower())]
+
+
+def list_figures(pmcid: str):
+    """Image files for one article in the PMC Open Access cloud bucket (public, no key)."""
+    import urllib.request
+    url = f"{S3}/?list-type=2&prefix={pmcid}.&max-keys=200"
+    for _ in range(3):
+        try:
+            with urllib.request.urlopen(url, timeout=20) as r:
+                xml = r.read().decode("utf-8", "replace")
+            keys = re.findall(r"<Key>([^<]+)</Key>", xml)
+            if not keys:
+                return None
+            ver = sorted({k.split("/")[0] for k in keys}, key=natkey)[-1]      # latest version folder
+            imgs = sorted([k.split("/", 1)[1] for k in keys if k.startswith(ver + "/") and k.lower().endswith(IMG_EXT)
+                           and not re.search(r"(thumb|icon|logo)", k, re.I)], key=natkey)
+            return ver, imgs
+        except Exception:
+            continue
+    return None
+
+
+def tag_specialties(case: dict) -> None:
+    sps = defaultdict(int)
+    for e in case["events"]:
+        hits = [k for k, rx in SPEC_RX.items() if rx.search(e["t"])]
+        if hits:
+            e["sp"] = hits
+            for h in hits:
+                sps[h] += 1
+    case["sps"] = sorted(sps, key=lambda k: -sps[k])
+
+
+def write_ward(wid: str, cases: list, shard: int) -> list:
+    d = OUT / "cases" / wid
+    d.mkdir(parents=True, exist_ok=True)
+    for old in d.glob("*.json"):
+        old.unlink()
+    index = []
+    for k in range(0, len(cases), shard):
+        chunk = cases[k:k + shard]
+        (d / f"{k // shard}.json").write_text(json.dumps(chunk, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+        for c in chunk:
+            index.append({"id": c["id"], "k": k // shard, "age": c["age"], "sex": c["sex"], "t": int(c["tricky"]),
+                          "sp": c["sps"][:6], "f": len(c.get("figs", {}).get("i", [])), "sub": c["sub"]})
+    (d / "index.json").write_text(json.dumps(index, separators=(",", ":")), encoding="utf-8")
+    return index
+
+
+def build(library: Path, per_ward: int, min_year: str, shard: int, figures: bool) -> None:
+    from concurrent.futures import ThreadPoolExecutor
     con = sqlite3.connect(library / "index.sqlite3")
     base = ("select pmcid, title, path, domain from articles where article_type='case-report' "
             "and license_code in ('CC BY','CC0') and g6='pass' and year >= ? ")
     (OUT / "cases").mkdir(parents=True, exist_ok=True)
-    used: set[str] = set()
-    ward_index = []
+    for old in (OUT / "cases").glob("*.json"):
+        old.unlink()                                                     # v0.1 single-file wards
+    every = con.execute(base + "order by substr(xml_sha256,1,12)", [min_year]).fetchall()
+    used = set()
+    ward_index, all_cases = [], []
     total = 0
     for w in WARDS:
         if w["domains"]:
-            q = base + f"and domain in ({','.join('?' * len(w['domains']))}) order by substr(xml_sha256,1,12)"
-            rows = con.execute(q, [min_year, *w["domains"]]).fetchall()
+            doms = set(w["domains"])
+            rows = [r for r in every if r[3] in doms]
         else:
-            rows = [r for r in con.execute(base + "order by substr(xml_sha256,1,12)", [min_year])
-                    if w["title_rx"].search(r[1] or "")]
+            extra = set(w.get("extra_domains", []))
+            rows = [r for r in every if r[3] in extra or w["title_rx"].search(r[1] or "")]
         rows = [r for r in rows if r[0] not in used and not ANIMAL_RX.search(r[1] or "")
                 and not SERIES_RX.search(r[1] or "")]
-        # round-robin across domains so a ward is not all one subspecialty
-        by_dom = defaultdict(list)
+        by_dom = defaultdict(list)                                       # round-robin across subspecialties
         for r in rows:
             by_dom[r[3]].append(r)
         order = []
@@ -328,7 +430,7 @@ def build(library: Path, per_ward: int, min_year: str) -> None:
                 if by_dom[d]:
                     order.append(by_dom[d].pop(0))
         cases, tried = [], 0
-        zcache: dict[str, zipfile.ZipFile] = {}
+        zcache = {}
         for pmcid, title, path, domain in order:
             if len(cases) >= per_ward:
                 break
@@ -355,30 +457,69 @@ def build(library: Path, per_ward: int, min_year: str) -> None:
                 continue
             first = parsed["events"][0]["t"]
             n_c = sum(1 for e in parsed["events"] if e.get("c"))
-            tricky = bool(re.search(r"\b(rare|unusual|atypical|mimick\w*|masquerad\w+|misdiagnos\w+|unexpected|"
-                                    r"challeng\w+|pitfall|uncommon|first report)\b", title or "", re.I)) or n_c >= 2
-            cases.append({"id": pmcid, "ward": w["id"], "sub": domain, **demographics(" ".join(e["t"] for e in parsed["events"][:3])),
-                          "tricky": tricky, "nc": n_c,
-                          "complaint": first, **parsed, "src": meta})
+            tricky = bool(UNIQUE_RX.search(title or "") or re.search(r"\b(mimick\w*|masquerad\w+|misdiagnos\w+|"
+                          r"unexpected|challeng\w+|pitfall)\b", title or "", re.I)) or n_c >= 2
+            c = {"id": pmcid, "ward": w["id"], "sub": domain, **demographics(" ".join(e["t"] for e in parsed["events"][:3])),
+                 "tricky": tricky, "nc": n_c, "complaint": first, **parsed, "src": meta, "_caps": figure_captions(md)}
+            tag_specialties(c)
+            cases.append(c)
             used.add(pmcid)
         for z in zcache.values():
             z.close()
-        (OUT / "cases" / f"{w['id']}.json").write_text(
-            json.dumps(cases, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
-        ward_index.append({"id": w["id"], "name": w["name"], "count": len(cases),
-                           "subs": sorted({c["sub"] for c in cases})})
-        total += len(cases)
-        print(f"{w['id']:14s} kept {len(cases):4d} of {tried:5d} read ({len(rows)} candidates)", flush=True)
-    (OUT / "wards.json").write_text(json.dumps({"wards": ward_index, "total": total,
+        all_cases.extend(cases)
+        print(f"{w['id']:14s} kept {len(cases):5d} of {tried:6d} read ({len(rows)} candidates)", flush=True)
+
+    if figures:
+        print("listing figures in the PMC OA cloud bucket ...", flush=True)
+        with ThreadPoolExecutor(24) as ex:
+            for c, res in zip(all_cases, ex.map(lambda c: list_figures(c["id"]), all_cases)):
+                caps = c.pop("_caps")
+                if not res or not res[1]:
+                    continue
+                ver, imgs = res
+                imgs = imgs[:12]
+                paired = len(caps) == len(imgs)
+                c["figs"] = {"v": ver, "i": imgs, "c": [cp for _, cp in caps][:12] if paired else []}
+        print("cases with figures:", sum(1 for c in all_cases if c.get("figs")), flush=True)
+    for c in all_cases:
+        c.pop("_caps", None)
+
+    by_ward = defaultdict(list)
+    for c in all_cases:
+        by_ward[c["ward"]].append(c)
+    for w in WARDS:
+        cs = by_ward[w["id"]]
+        write_ward(w["id"], cs, shard)
+        ward_index.append({"id": w["id"], "name": w["name"], "blurb": w["blurb"], "count": len(cs),
+                           "shards": (len(cs) + shard - 1) // shard, "subs": sorted({c["sub"] for c in cs})})
+        total += len(cs)
+    # multidisciplinary collection: cases where 3+ core specialties have something to say
+    mdt = [dict(c, home=c["ward"], ward="mdt") for c in all_cases if len(MDT_CORE & set(c["sps"])) >= 3]
+    rr = defaultdict(list)
+    for c in mdt:
+        rr[c["home"]].append(c)
+    mdt_sorted = []
+    while any(rr.values()) and len(mdt_sorted) < per_ward:
+        for k in list(rr):
+            if rr[k] and len(mdt_sorted) < per_ward:
+                mdt_sorted.append(rr[k].pop(0))
+    write_ward("mdt", mdt_sorted, shard)
+    ward_index.insert(0, {"id": "mdt", "name": MDT_WARD["name"], "blurb": MDT_WARD["blurb"], "count": len(mdt_sorted),
+                          "shards": (len(mdt_sorted) + shard - 1) // shard, "collection": True,
+                          "subs": sorted({c["home"] for c in mdt_sorted})})
+    (OUT / "wards.json").write_text(json.dumps({"wards": ward_index, "total": total, "shard": shard,
         "source": "PMC Open Access Subset (NIH/NLM), CC BY / CC0 case reports, verbatim",
+        "figures": "PMC Open Access cloud bucket (pmc-oa-opendata, AWS Open Data)",
         "min_year": min_year}, indent=1), encoding="utf-8")
-    print("total", total)
+    print("total", total, "| multidisciplinary", len(mdt_sorted))
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--library", required=True, type=Path, help="folder holding index.sqlite3 and the <domain>/<design>/<year>.zip files")
-    ap.add_argument("--per-ward", type=int, default=300)
-    ap.add_argument("--min-year", default="2015")
+    ap.add_argument("--per-ward", type=int, default=1000)
+    ap.add_argument("--min-year", default="2012")
+    ap.add_argument("--shard", type=int, default=100)
+    ap.add_argument("--no-figures", action="store_true")
     a = ap.parse_args()
-    build(a.library, a.per_ward, a.min_year)
+    build(a.library, a.per_ward, a.min_year, a.shard, not a.no_figures)

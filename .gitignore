@@ -1,4 +1,5 @@
-build/build.log
+build/*.log
+build/drug_cards_all.json
 __pycache__/
 *.pyc
 .DS_Store

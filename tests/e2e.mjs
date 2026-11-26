@@ -21,9 +21,21 @@ await shot("e2e_workup");
 await sayIt("My diagnosis is abdominal tuberculosis");
 await sayIt("My plan is antitubercular therapy and supportive care");
 await shot("e2e_plan");
-for (let k = 0; k < 15; k++) { const ph = await ev("document.querySelector('.ph.on')?.textContent"); if (ph === "Debrief") break; await sayIt("next"); }
-await sayIt("next"); await sleep(800);
+const seen = new Set();
+for (let k = 0; k < 60; k++) {
+  if (await ev("!!document.querySelector('.scorecard')")) break;
+  const ph = await ev("document.querySelector('.ph.on')?.textContent"); seen.add(ph);
+  const last = await ev("[...document.querySelectorAll('.msg:not(.you) .body')].pop()?.textContent || ''");
+  if (ph === "Team review") { if (!seen.has("shotTeam")) { seen.add("shotTeam"); await shot("e2e_team"); } await sayIt("I would check this carefully and involve the team early"); }
+  else if (ph === "HOD & quiz") {
+    if (/what did you learn/i.test(last)) { await shot("e2e_quiz"); await sayIt("I learned to look for the red flags early and to confirm the diagnosis with the right test"); }
+    else await sayIt("A");
+  }
+  else await sayIt("next");
+}
+await sleep(800);
 await shot("e2e_debrief");
-const counts = await ev(`({msgs:document.querySelectorAll('.msg').length, nodoc:[...document.querySelectorAll('.msg .body')].filter(b=>/isn't documented/.test(b.textContent)).length, score:!!document.querySelector('.scorecard'), phase:document.querySelector('.ph.on')?.textContent, saved:JSON.parse(localStorage.getItem('mediorounds.v1')||'{}').sessions?.length})`);
+const counts = await ev(`({msgs:document.querySelectorAll('.msg').length, roles:[...new Set([...document.querySelectorAll('.msg')].map(m=>m.className.replace('msg ','')))], score:!!document.querySelector('.scorecard'), phases:${JSON.stringify([])}, saved:JSON.parse(localStorage.getItem('mediorounds.v1')||'{}').sessions?.length, xp:JSON.parse(localStorage.getItem('mediorounds.v1')||'{}').xp, badges:JSON.parse(localStorage.getItem('mediorounds.v1')||'{}').badges, deck:JSON.parse(localStorage.getItem('mediorounds.v1')||'{}').deck?.length})`);
+counts.phases = [...seen].filter(x => x && !x.startsWith("shot"));
 console.log(JSON.stringify(counts), "errors:", errors);
 proc.kill(); process.exit(errors.length ? 1 : 0);
