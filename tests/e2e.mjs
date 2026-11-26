@@ -14,7 +14,8 @@ const send = (method, params = {}) => new Promise(r => { const i = ++id; pending
 const ev = async expr => (await send("Runtime.evaluate", { expression: expr, awaitPromise: true, returnByValue: true })).result?.result?.value;
 const shot = async name => { const r = await send("Page.captureScreenshot", { format: "png" }); writeFileSync(`${shots}/${name}.png`, Buffer.from(r.result.data, "base64")); };
 await send("Runtime.enable"); await send("Page.enable");
-await send("Page.navigate", { url }); await sleep(2500);
+await send("Page.navigate", { url });
+for (let i = 0; i < 120 && !(await ev("!!document.querySelector('#text') && document.querySelectorAll('.msg').length >= 2")); i++) await sleep(250);
 const sayIt = async t => { await ev(`(()=>{const i=document.querySelector('#text');i.value=${JSON.stringify(t)};document.querySelector('#say').requestSubmit();})()`); await sleep(700); };
 for (const t of ["What brought you here and since when?", "Any past medical history?", "Check vitals", "Examine the abdomen", "Order CBC and biochemistry", "Order CT and ultrasound", "My differentials are appendicitis, TB, lymphoma", "hint"]) await sayIt(t);
 await shot("e2e_workup");

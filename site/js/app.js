@@ -236,7 +236,8 @@ async function renderCase(wardId, caseId) {
   if (!row) { location.hash = "#/"; return; }
   const shard = await loadShard(wardId, row.k);
   const c = shard.find(x => x.id === caseId);
-  await loadDrugs();
+  const drugsReady = loadDrugs();                     // large file: load in the background, don't block the bedside
+  drugsReady.then(() => { if (app.caseObj === c) updateNotes(); });
   app.caseObj = c; app.ward = w.wards.find(x => x.id === wardId); app.shardTitles = shard.map(x => x.src.title);
   app.sess = new CaseSession(c);
   Object.assign(app, { mode: null, teamQ: [], quiz: [], qi: 0, quizRight: 0, xpCase: 0, pharmSeen: new Set(), figShown: new Set(), lastActivity: Date.now(), lastNudge: Date.now() });
@@ -626,6 +627,7 @@ async function startTeaching() {
   const rest = c.figs ? c.figs.i.map((_, i) => i).filter(i => !app.figShown.has(i)) : [];
   if (rest.length) { rest.forEach(i => app.figShown.add(i)); P.push({ role: "radiologist", en: "All the figures from the article.", html: "All the figures from the article." + figGrid(rest), speak: "All the figures from the article are on screen." }); }
   await say(P);
+  await loadDrugs();
   app.quiz = buildQuiz(s, app.drugs || null, app.shardTitles); app.qi = 0; app.quizRight = 0;
   if (!app.quiz.length) return startReflect();
   await say([{ role: "senior", en: `Quick quiz: ${app.quiz.length} questions. Say or tap A, B, C or D.` }]);
