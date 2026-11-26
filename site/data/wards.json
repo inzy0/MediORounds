@@ -1,0 +1,121 @@
+{
+ "wards": [
+  {
+   "id": "medicine",
+   "name": "General Medicine",
+   "count": 300,
+   "subs": [
+    "cardiology",
+    "endocrinology_metabolism",
+    "gastroenterology_hepatology",
+    "general_medicine",
+    "hematology",
+    "immunology_rheumatology",
+    "infectious_disease",
+    "nephrology_urology",
+    "neurology",
+    "respiratory"
+   ]
+  },
+  {
+   "id": "surgery",
+   "name": "General Surgery",
+   "count": 300,
+   "subs": [
+    "surgery_anesthesia"
+   ]
+  },
+  {
+   "id": "obg",
+   "name": "Obstetrics & Gynaecology",
+   "count": 300,
+   "subs": [
+    "obstetrics_gynecology"
+   ]
+  },
+  {
+   "id": "paeds",
+   "name": "Paediatrics",
+   "count": 300,
+   "subs": [
+    "pediatrics_neonatal"
+   ]
+  },
+  {
+   "id": "ortho",
+   "name": "Orthopaedics",
+   "count": 300,
+   "subs": [
+    "musculoskeletal_orthopedics"
+   ]
+  },
+  {
+   "id": "emergency",
+   "name": "Emergency & ICU",
+   "count": 300,
+   "subs": [
+    "emergency_critical_care"
+   ]
+  },
+  {
+   "id": "psychiatry",
+   "name": "Psychiatry",
+   "count": 300,
+   "subs": [
+    "mental_health"
+   ]
+  },
+  {
+   "id": "ent",
+   "name": "ENT",
+   "count": 300,
+   "subs": [
+    "cardiology",
+    "dentistry_oral",
+    "dermatology",
+    "emergency_critical_care",
+    "endocrinology_metabolism",
+    "gastroenterology_hepatology",
+    "general_medicine",
+    "genetics_genomics",
+    "health_services_education",
+    "hematology",
+    "immunology_rheumatology",
+    "infectious_disease",
+    "mental_health",
+    "musculoskeletal_orthopedics",
+    "nephrology_urology",
+    "neurology",
+    "nutrition",
+    "obstetrics_gynecology",
+    "oncology",
+    "ophthalmology",
+    "pediatrics_neonatal",
+    "pharmacology",
+    "public_health_epidemiology",
+    "rehabilitation_sports_exercise",
+    "respiratory",
+    "surgery_anesthesia"
+   ]
+  },
+  {
+   "id": "ophthalmology",
+   "name": "Ophthalmology",
+   "count": 300,
+   "subs": [
+    "ophthalmology"
+   ]
+  },
+  {
+   "id": "dermatology",
+   "name": "Dermatology",
+   "count": 300,
+   "subs": [
+    "dermatology"
+   ]
+  }
+ ],
+ "total": 3000,
+ "source": "PMC Open Access Subset (NIH/NLM), CC BY / CC0 case reports, verbatim",
+ "min_year": "2015"
+}
