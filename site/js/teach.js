@@ -91,7 +91,7 @@ function maskSentence(s, term) {
 
 export function buildQuiz(sess, drugs, otherTitles) {
   const c = sess.c; seeded(c.id);
-  const qs = [];
+  const qs = [], usedSrc = new Set();               // one question per source sentence, so answers don't leak
   // 1) final diagnosis, against real titles of other cases in the same ward
   const others = shuffle(otherTitles.filter(t => t && t !== c.src.title)).slice(0, 3);
   if (others.length === 3) qs.push({ kind: "dx", stem: "Which of these was the published diagnosis for this patient?", answer: c.src.title,
@@ -110,9 +110,9 @@ export function buildQuiz(sess, drugs, otherTitles) {
     }
     const seen = new Set();
     for (const { e, nm } of shuffle(found)) {
-      if (seen.has(nm) || qs.filter(q => q.kind === "drug").length >= 2) continue;
+      if (seen.has(nm) || usedSrc.has(e.i) || qs.filter(q => q.kind === "drug").length >= 2) continue;
       const stem = maskSentence(e.t, nm); if (!stem) continue;
-      seen.add(nm);
+      seen.add(nm); usedSrc.add(e.i);
       const pool = shuffle(names.filter(n => n !== nm && n !== alias[nm] && !stem.toLowerCase().includes(n))).slice(0, 3);
       if (pool.length < 3) continue;
       qs.push({ kind: "drug", stem: "Fill the gap (from the case): " + stem, answer: nm, options: shuffle([nm, ...pool]), src: e.t });
@@ -120,7 +120,7 @@ export function buildQuiz(sess, drugs, otherTitles) {
   }
   // 3) one investigation
   const tests = [];
-  for (const e of sess.ev) for (const t of TEST_TERMS) { const st = maskSentence(e.t, t); if (st) tests.push({ e, t, st }); }
+  for (const e of sess.ev) { if (usedSrc.has(e.i)) continue; for (const t of TEST_TERMS) { const st = maskSentence(e.t, t); if (st) tests.push({ e, t, st }); } }
   if (tests.length) {
     const pick = shuffle(tests)[0];
     const pool = shuffle(TEST_TERMS.filter(t => t !== pick.t && !pick.st.toLowerCase().includes(t.toLowerCase()))).slice(0, 3);

@@ -139,6 +139,15 @@ def step1(labels: Path, dosing: Path) -> None:
     CACHE.write_text(json.dumps(cards, ensure_ascii=False), encoding="utf-8")
 
 
+# Label "base names" that are everyday words in case text, not a medicine the student should learn as one.
+NOT_A_DRUG = {"vitamin", "alcohol", "oxygen", "water", "sodium", "potassium", "calcium", "iron", "glucose", "dextrose",
+              "magnesium", "zinc", "nitrogen", "air", "saline", "sugar", "oil", "talc", "honey", "sulfur", "copper",
+              "carbon dioxide", "helium", "barium", "iodine", "gold", "silver", "lead", "salt", "ethanol", "urea",
+              "albumin", "protein", "collagen", "hydrogen peroxide", "petrolatum", "menthol", "camphor", "lactose"}
+ROUTE_WORDS = {"oral", "injection", "topical", "ophthalmic", "nasal", "rectal", "vaginal", "transdermal", "inhalation",
+               "intravenous", "otic", "kit", "tablets", "capsules", "solution", "suspension", "cream", "gel"}
+
+
 def step2(aliases: Path | None) -> None:
     cards = json.loads(CACHE.read_text(encoding="utf-8"))
     alias = {}
@@ -166,8 +175,10 @@ def step2(aliases: Path | None) -> None:
     for nm in names:
         if len(nm) < 4 or not re.search(r"[a-z]", nm):
             continue
+        target = alias.get(nm, nm)
+        if nm in NOT_A_DRUG or target in NOT_A_DRUG or nm.split()[-1] in ROUTE_WORDS or target.split()[-1] in ROUTE_WORDS:
+            continue
         if " ".join(re.findall(r"[a-z][a-z0-9-]*", nm)) in grams:
-            target = alias.get(nm, nm)
             if target in cards:
                 keep[target] = cards[target]
                 if nm != target:
