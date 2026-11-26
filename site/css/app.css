@@ -143,7 +143,7 @@ body[data-voice="thinking"] .orb { animation: spin 1s linear infinite; }
 .about p { max-width: 75ch; }
 
 @media (max-width: 900px) {
-  main.round { grid-template-columns: 1fr; height: auto; }
+  main.round { grid-template-columns: minmax(0, 1fr); height: auto; }
   .stage { height: calc(100dvh - 58px); border-right: none; }
   .notes { border-top: 1px solid var(--line); }
   .bar { grid-template-columns: 110px 1fr 44px; } .bar em { display: none; }
@@ -209,3 +209,34 @@ details.drug p { margin: .35rem 0; }
 .msg details.drug { background: var(--bg2); }
 .res { list-style: none; padding: 0 !important; }
 .body.extra { margin-top: .4rem; }
+
+/* ---------- phone layout: give the conversation the screen ---------- */
+@media (max-width: 700px) {
+  body[data-view="case"] .top { position: static; padding: .4rem 12px; gap: .4rem; }
+  body[data-view="case"] .top nav a { display: none; }
+  body[data-view="case"] .top nav { gap: .5rem; }
+  body[data-view="case"] .brand { font-size: 1rem; }
+  main.round .stage { height: calc(100dvh - 46px); }
+  .casebar { padding: .4rem 12px; font-size: .85rem; }
+  .phases, .teamstrip, .chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .phases::-webkit-scrollbar, .teamstrip::-webkit-scrollbar, .chips::-webkit-scrollbar { display: none; }
+  .ph, .chip, .av { flex: none; }
+  .teamstrip { padding: .3rem 12px; }
+  .chat { padding: .7rem 12px; }
+  .msg { max-width: 100%; padding: .55rem .75rem; font-size: .95rem; }
+  .dock { padding: .4rem 12px .6rem; }
+  .orbrow { gap: .7rem; margin: .1rem 0 .35rem; }
+  .orb { width: 52px; height: 52px; }
+  .orbside { font-size: .8rem; }
+  .chips { margin-bottom: .4rem; }
+  .say input { padding: .55rem .8rem; }
+  .say .btn { padding: .55rem .9rem; }
+  .hero { padding: 1rem 0 .5rem; }
+  .hero-stats > div, .stat-link { min-width: 0; flex: 1 1 40%; }
+}
+@media (max-width: 700px) {
+  .casebar { flex-direction: column; align-items: stretch; }
+  .casebar > div, .phases { min-width: 0; max-width: 100%; }
+  .stage, .chat, .dock { min-width: 0; }
+}
+.av { text-transform: none; letter-spacing: 0; }

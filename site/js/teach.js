@@ -5,7 +5,7 @@ import { terms, INV } from "./engine.js";
 export const TEAM = {
   senior: { label: "Senior Resident", short: "SR", color: "#3d63f5" },
   hod: { label: "HOD · Consultant", short: "HOD", color: "#7a3cff" },
-  patient: { label: "Patient · case record", short: "Pt", color: "#0b84a5" },
+  patient: { label: "Patient · case record", short: "Pat", color: "#0b84a5" },
   nurse: { label: "Ward Nurse / Lab", short: "RN", color: "#1a9b6c" },
   record: { label: "Case record", short: "Rx", color: "#9a6b00" },
   surgeon: { label: "Surgeon", short: "Sx", color: "#c2410c" },
