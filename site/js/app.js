@@ -4,6 +4,7 @@ import { LANGS, langOf, translate, prepare, translatorSupported, numbersMatch } 
 import { TEAM, SPEAKERS, TEAM_Q, PEER_IDEAS, speakerFor, objectives, buildQuiz, judgeAnswer, reflect,
   figureURL, figuresFor, resources, doseChecks, DOSE_STATUS, imageQuestions } from "./teach.js";
 import * as store from "./store.js";
+import * as auth from "./auth.js";
 
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -19,6 +20,37 @@ const app = {
   set: Object.assign({ live: false, barge: false, mute: false, away: "pause", rate: 1, pharm: true, peer: true, nudge: 25, cam: false }, P0.set || {}),
 };
 const saveSet = () => store.setPref(db, "set", app.set);
+
+// ---------------------------------------------------------------- accounts & cloud sync
+app.sync = "local";                                   // local | saving | saved | error | offline
+function setSync(state) {
+  app.sync = state;
+  if (state === "saved") { db.xpBase = db.xp; try { localStorage.setItem("mediorounds.v1", JSON.stringify(db)); } catch {} }
+  const el = $("#syncDot"); if (el) { el.dataset.s = state; el.title = { saving: "Saving to your account…", saved: "Saved to your account", error: "Couldn't save to your account. Will retry.", local: "Saved in this browser only" }[state] || ""; }
+}
+store.onSave(d => auth.schedulePush(d, setSync));
+async function syncDown(u) {
+  if (app.syncing) return app.syncing;
+  app.syncing = (async () => { try {
+    const cloud = await auth.pull();
+    const merged = store.merge(db, cloud, u.id);
+    for (const k of Object.keys(db)) if (!(k in merged)) delete db[k];
+    Object.assign(db, merged);
+    store.save(db);                                   // writes locally and uploads the merged copy
+    toast("Progress synced to your account", "badge");
+  } catch (e) { setSync("error"); toast("Couldn't reach your account. Progress is kept in this browser.", "neg"); }
+  finally { app.syncing = null; } })();
+  return app.syncing;
+}
+// Never block the page on the account service: draw first, then sign-in state catches up.
+const refreshChrome = () => { if (!app.sess || app.sess.finished) render(); };
+if (auth.cloudEnabled) {
+  setTimeout(() => {
+    auth.init().then(u => { if (u) return syncDown(u).then(refreshChrome); refreshChrome(); })
+      .catch(e => console.warn("account service unavailable:", e && e.message));
+    auth.onAuth(u => { if (u && db.owner !== u.id) syncDown(u).then(refreshChrome); else refreshChrome(); });
+  }, 0);
+}
 
 // ---------------------------------------------------------------- voice
 const voice = new Voice({
@@ -150,6 +182,7 @@ async function render() {
   if (view === "progress") return renderProgress();
   if (view === "review") return renderReview();
   if (view === "about") return renderAbout();
+  if (view === "account") return renderAccount();
   return renderHome();
 }
 
@@ -166,6 +199,9 @@ function shell(inner) {
       <a href="#/progress" data-i18n>My progress</a>
       <a href="#/about" data-i18n>About</a>
       <span class="xp" title="Experience points">${esc(lv.name)} · ${db.xp} XP</span>
+      ${auth.cloudEnabled ? (auth.currentUser()
+        ? `<a href="#/account" class="acct"><span id="syncDot" class="syncdot" data-s="${app.sync}"></span>${esc(auth.displayName())}</a>`
+        : `<a href="#/account" class="btn small primary" data-i18n>Sign in</a>`) : ""}
       <label class="lang"><span class="sr">Language</span><select id="lang">${opts}</select></label>
     </nav>
   </header>
@@ -816,6 +852,92 @@ async function renderProgress() {
   $("#csv").onclick = () => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([store.toCSV(db)], { type: "text/csv" })); a.download = "mediorounds_progress.csv"; a.click(); };
   $("#reset").onclick = () => { if (confirm("Delete all progress, XP, badges and review cards stored in this browser?")) { Object.assign(db, { sessions: [], xp: 0, badges: [], deck: [], reflections: [] }); store.save(db); renderProgress(); } };
 }
+
+// ---------------------------------------------------------------- account
+async function renderAccount() {
+  if (!auth.cloudEnabled) {
+    shell(`<main class="account"><h1 data-i18n>Account</h1>
+      <div class="card"><p data-i18n>Accounts aren't switched on for this site yet, so your progress is saved in this browser only.</p>
+      <p class="muted small" data-i18n>Site owner: follow docs/ACCOUNTS_SETUP.md to connect a free Supabase project.</p></div></main>`);
+    return;
+  }
+  await auth.init().catch(() => null);
+  const u = auth.currentUser();
+  const recovery = /type=recovery/.test(location.href) || app.recovery;
+  if (u && !recovery) {
+    shell(`<main class="account"><h1 data-i18n>Your account</h1>
+      <div class="card">
+        <p><b>${esc(auth.displayName())}</b><br><span class="muted">${esc(u.email)}</span></p>
+        <p><span id="syncDot" class="syncdot" data-s="${app.sync}"></span> <span data-i18n>Your cases, XP, badges, review deck and reflections are saved to your account and follow you to any device.</span></p>
+        <p class="muted small">${db.sessions.length} cases · ${db.xp} XP · ${db.badges.length} badges · ${db.deck.length} review cards</p>
+        <div class="row"><button class="btn primary" id="syncNow" data-i18n>Sync now</button><button class="btn" id="signOut" data-i18n>Sign out</button></div>
+      </div>
+      <details class="card"><summary data-i18n>Change password</summary>
+        <form id="pwForm" class="authform"><input type="password" id="pw1" minlength="8" placeholder="New password (8+ characters)" autocomplete="new-password" required><button class="btn" data-i18n>Update password</button></form></details>
+      <details class="card danger-zone"><summary data-i18n>Delete my account</summary>
+        <p class="small" data-i18n>This permanently deletes your account and all progress saved to it. Progress in this browser is cleared too.</p>
+        <button class="btn danger" id="delAcct" data-i18n>Delete my account and data</button></details>
+      <p class="muted small" data-i18n>What we store: your email, the name you chose, and your learning progress. Never patient data. Stored with Supabase; only you can read your progress.</p>
+      <p id="amsg" class="amsg"></p></main>`);
+    $("#syncNow").onclick = async () => { await syncDown(u); renderAccount(); };
+    $("#signOut").onclick = async () => {
+      await auth.signOut();
+      store.clearLocal(db);                              // shared lab computers: don't leave progress behind
+      toast("Signed out. Your progress is safe in your account.", "badge");
+      location.hash = "#/";
+    };
+    $("#pwForm").onsubmit = async e => { e.preventDefault(); try { await auth.updatePassword($("#pw1").value); amsg("Password updated.", true); } catch (er) { amsg(er.message); } };
+    $("#delAcct").onclick = async () => {
+      if (!confirm("Permanently delete your account and all saved progress?")) return;
+      try { await auth.deleteAccount(); store.clearLocal(db); toast("Account deleted.", "badge"); location.hash = "#/"; } catch (er) { amsg(er.message); }
+    };
+    return;
+  }
+  if (recovery) {
+    shell(`<main class="account"><h1 data-i18n>Set a new password</h1><div class="card">
+      <form id="newPw" class="authform"><input type="password" id="np" minlength="8" placeholder="New password (8+ characters)" autocomplete="new-password" required><button class="btn primary" data-i18n>Save password</button></form>
+      <p id="amsg" class="amsg"></p></div></main>`);
+    $("#newPw").onsubmit = async e => { e.preventDefault(); try { await auth.updatePassword($("#np").value); app.recovery = false; amsg("Password saved. You're signed in.", true); setTimeout(() => location.hash = "#/", 1200); } catch (er) { amsg(er.message); } };
+    return;
+  }
+  shell(`<main class="account"><h1 data-i18n>Sign in to save your progress</h1>
+    <p class="muted" data-i18n>Free account. Your cases, XP, badges, review deck and reflections are saved and follow you to any device.</p>
+    <div class="tabs" role="tablist">
+      <button class="tab on" data-tab="in" data-i18n>Sign in</button><button class="tab" data-tab="up" data-i18n>Create account</button><button class="tab" data-tab="link" data-i18n>Email me a link</button>
+    </div>
+    <div class="card">
+      <form id="f_in" class="authform"><input type="email" id="e_in" placeholder="Email" autocomplete="email" required><input type="password" id="p_in" placeholder="Password" autocomplete="current-password" required>
+        <button class="btn primary" data-i18n>Sign in</button><button type="button" class="linkbtn" id="forgot" data-i18n>Forgot password?</button></form>
+      <form id="f_up" class="authform" hidden><input type="text" id="n_up" placeholder="Your name" autocomplete="name" maxlength="60" required><input type="email" id="e_up" placeholder="Email" autocomplete="email" required>
+        <input type="password" id="p_up" minlength="8" placeholder="Password (8+ characters)" autocomplete="new-password" required>
+        <label class="switch small"><input type="checkbox" id="agree" required><span data-i18n>I'm a student or clinician using this for learning, and I won't enter real patient details.</span></label>
+        <button class="btn primary" data-i18n>Create account</button></form>
+      <form id="f_link" class="authform" hidden><input type="email" id="e_link" placeholder="Email" autocomplete="email" required><button class="btn primary" data-i18n>Send sign-in link</button>
+        <p class="muted small" data-i18n>We'll email you a one-time link. No password needed.</p></form>
+      <p id="amsg" class="amsg"></p>
+    </div>
+    ${db.sessions.length ? `<p class="muted small">${db.sessions.length} cases and ${db.xp} XP in this browser will be added to your account when you sign in.</p>` : ""}
+    <p class="muted small" data-i18n>What we store: your email, the name you chose, and your learning progress. Never patient data.</p></main>`);
+  document.querySelectorAll(".tab").forEach(t => t.onclick = () => {
+    document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x === t));
+    ["in", "up", "link"].forEach(k => { $("#f_" + k).hidden = k !== t.dataset.tab; }); amsg("");
+  });
+  const busy = (f, on) => f.querySelectorAll("button,input").forEach(x => x.disabled = on);
+  $("#f_in").onsubmit = async e => { e.preventDefault(); busy(e.target, true);
+    try { await auth.signIn($("#e_in").value.trim(), $("#p_in").value); amsg("Signed in.", true); setTimeout(() => location.hash = "#/", 600); }
+    catch (er) { amsg(/confirm/i.test(er.message) ? "Please confirm your email first. Check your inbox for the link." : er.message); } finally { busy(e.target, false); } };
+  $("#f_up").onsubmit = async e => { e.preventDefault(); busy(e.target, true);
+    try { const r = await auth.signUp($("#e_up").value.trim(), $("#p_up").value, $("#n_up").value.trim());
+      amsg(r.needsConfirm ? "Account created. Check your email and click the confirmation link, then sign in." : "Account created. You're signed in.", true);
+      if (!r.needsConfirm) setTimeout(() => location.hash = "#/", 800); }
+    catch (er) { amsg(er.message); } finally { busy(e.target, false); } };
+  $("#f_link").onsubmit = async e => { e.preventDefault(); busy(e.target, true);
+    try { await auth.magicLink($("#e_link").value.trim()); amsg("Link sent. Open it on this device to sign in.", true); } catch (er) { amsg(er.message); } finally { busy(e.target, false); } };
+  $("#forgot").onclick = async () => { const em = $("#e_in").value.trim(); if (!em) { amsg("Type your email above first."); return; }
+    try { await auth.resetPassword(em); amsg("Password reset email sent.", true); } catch (er) { amsg(er.message); } };
+}
+function amsg(t, ok) { const el = $("#amsg"); if (el) { el.textContent = t; el.className = "amsg " + (ok ? "ok" : t ? "bad" : ""); } }
+if (auth.cloudEnabled) auth.onAuth(() => { if (/type=recovery/.test(location.href)) { app.recovery = true; location.hash = "#/account"; } });
 
 // ---------------------------------------------------------------- about
 async function renderAbout() {

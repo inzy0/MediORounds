@@ -24,6 +24,8 @@ jobs:
           node-version: 22
       - name: Run every case through a scripted ward round
         run: node tests/engine.test.mjs
+      - name: Progress merge (accounts)
+        run: node tests/merge.test.mjs
 
   deploy:
     needs: test

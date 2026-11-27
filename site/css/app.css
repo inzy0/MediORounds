@@ -253,3 +253,19 @@ details.drug p { margin: .35rem 0; }
 .loadfail { margin: 1rem auto; max-width: 640px; }
 body.busy { cursor: progress; }
 body.busy [data-go] { opacity: .6; pointer-events: none; }
+
+/* ---------- accounts ---------- */
+.account { max-width: 560px; }
+.account .card { margin: .8rem 0; }
+.authform { display: flex; flex-direction: column; gap: .55rem; }
+.authform input[type=email], .authform input[type=password], .authform input[type=text] { font: inherit; padding: .65rem .85rem; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+.tabs { display: flex; gap: .3rem; margin-top: 1rem; flex-wrap: wrap; }
+.tab { font: inherit; font-weight: 600; padding: .45rem .9rem; border-radius: 999px; border: 1px solid var(--line); background: var(--bg2); color: var(--muted); cursor: pointer; }
+.tab.on { background: var(--accent); color: #fff; border-color: transparent; }
+.amsg { min-height: 1.2em; font-size: .92rem; margin: .5rem 0 0; }
+.acct { display: inline-flex; align-items: center; gap: .35rem; font-weight: 600; color: var(--ink) !important; }
+.syncdot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); display: inline-block; }
+.syncdot[data-s="saved"] { background: #16a34a; } .syncdot[data-s="saving"] { background: #f59e0b; } .syncdot[data-s="error"] { background: var(--danger); }
+.danger-zone summary { color: var(--danger); cursor: pointer; }
+details.card summary { cursor: pointer; font-weight: 600; }
+.authform[hidden] { display: none; }

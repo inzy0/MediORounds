@@ -6,7 +6,40 @@ const blank = () => ({ sessions: [], prefs: {}, xp: 0, badges: [], deck: [], ref
 export function load() {
   try { return Object.assign(blank(), JSON.parse(localStorage.getItem(KEY) || "{}")); } catch { return blank(); }
 }
-export function save(db) { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch {} }
+let saveHook = null;
+export function onSave(fn) { saveHook = fn; }
+export function save(db) { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch {} if (saveHook) saveHook(db); }
+
+// Merge this browser's progress with the account's cloud copy (used at sign-in).
+// Sessions, badges, review cards and reflections are unions; XP adds what was earned on this device
+// since it last synced (or all of it, the first time guest progress is brought into an account).
+export function merge(local, cloud, uid) {
+  const L = Object.assign(blank(), local || {}), C = Object.assign(blank(), cloud || {});
+  const byKey = (arr, k) => { const m = new Map(); for (const x of arr) m.set(k(x), x); return m; };
+  const sess = byKey(C.sessions, s => s.id + "|" + s.date);
+  for (const s of L.sessions) sess.set(s.id + "|" + s.date, s);
+  const deck = byKey(C.deck, c => c.key);
+  for (const c of L.deck) { const o = deck.get(c.key); if (!o || (c.due || "") > (o.due || "")) deck.set(c.key, c); }
+  const refl = byKey(C.reflections, r => r.date + "|" + r.case);
+  for (const r of L.reflections) refl.set(r.date + "|" + r.case, r);
+  const sameOwner = L.owner === uid;
+  const gained = sameOwner ? Math.max(0, (L.xp || 0) - (L.xpBase || 0)) : (L.xp || 0);
+  const xp = (C.xp || 0) + gained;
+  return {
+    sessions: [...sess.values()].sort((a, b) => a.date.localeCompare(b.date)),
+    badges: [...new Set([...C.badges, ...L.badges])],
+    deck: [...deck.values()],
+    reflections: [...refl.values()].sort((a, b) => a.date.localeCompare(b.date)),
+    prefs: Object.assign({}, C.prefs, L.prefs),
+    xp, xpBase: xp, owner: uid,
+  };
+}
+export function clearLocal(db) {
+  const prefs = db.prefs;
+  for (const k of Object.keys(db)) delete db[k];
+  Object.assign(db, blank(), { prefs });
+  try { localStorage.setItem(KEY, JSON.stringify(db)); } catch {}
+}
 export function addSession(db, s) { db.sessions.push(s); save(db); }
 export function setPref(db, k, v) { db.prefs[k] = v; save(db); }
 
