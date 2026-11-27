@@ -51,6 +51,17 @@
   going), with an optional on-device camera mode.
 - **Phone layout:** the conversation gets most of the screen.
 
+## Built (v0.3, 2026-11-27)
+
+- **Dose check:** every dose in a case is compared with the amounts stated in the official US label's dosing
+  section (1,020 medicines). Of 24,426 dose mentions, 10,708 appear in the label, 13,063 do not, 237 are
+  weight-based, and 418 have no label dosing text. The site says "appears in the label", never "correct".
+- **Image questions:** "what kind of image is this?" and "which description matches this image?" (18,950
+  questions, all valid). The captioned gallery now comes after the quiz.
+- **Finish option** from rounds, team review, quiz or reflection, plus "Finish & back to wards".
+- **Fixed** the ward-opening bug: two GitHub Pages deploys published different layouts. Loading now retries and
+  shows a visible error with a Retry button.
+
 ## Known limits (honest list)
 
 - Patient replies are third-person case-record sentences, not first-person speech, because rewriting them would
@@ -68,7 +79,7 @@
 |---|---|---|
 | N1 | ~~Scale the case bank; split files so pages stay fast~~ Done in v0.2 (14,977 cases, shards of 100) | Engine test 0 errors: met |
 | N2 | Stage-sorting audit on a sample of 100 cases, rated by a human | Pre-registered accuracy bar |
-| N3 | Label-based dose check (DailyMed SPL data pre-built into static JSON) | Shown dose = label text 100% |
+| N3 | ~~Label-based dose check~~ Done in v0.3 (case dose vs label dosing text; label excerpt shown verbatim) | Label text shown verbatim: met |
 | N4 | Faculty dashboard via a free backend (e.g. Supabase free tier), opt-in | Owner decision: accounts and data storage |
 | N5 | NMC CBME competency mapping per ward | Codes checked against the NMC primary document |
 | N6 | Scoring validation with real faculty raters | kappa ≥ 0.6 |
