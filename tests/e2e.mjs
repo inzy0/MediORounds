@@ -35,8 +35,9 @@ for (let k = 0; k < 60; k++) {
   else await sayIt("next");
 }
 await sleep(800);
+await ev("document.querySelectorAll('.fig img').forEach(i=>i.loading='eager')"); await sleep(4000);
 await shot("e2e_debrief");
-const counts = await ev(`({msgs:document.querySelectorAll('.msg').length, roles:[...new Set([...document.querySelectorAll('.msg')].map(m=>m.className.replace('msg ','')))], score:!!document.querySelector('.scorecard'), phases:${JSON.stringify([])}, saved:JSON.parse(localStorage.getItem('mediorounds.v1')||'{}').sessions?.length, xp:JSON.parse(localStorage.getItem('mediorounds.v1')||'{}').xp, badges:JSON.parse(localStorage.getItem('mediorounds.v1')||'{}').badges, deck:JSON.parse(localStorage.getItem('mediorounds.v1')||'{}').deck?.length})`);
+const counts = await ev(`({msgs:document.querySelectorAll('.msg').length, roles:[...new Set([...document.querySelectorAll('.msg')].map(m=>m.className.replace('msg ','')))], score:!!document.querySelector('.scorecard'), phases:${JSON.stringify([])}, saved:JSON.parse(localStorage.getItem('mediorounds.v1')||'{}').sessions?.length, xp:JSON.parse(localStorage.getItem('mediorounds.v1')||'{}').xp, badges:JSON.parse(localStorage.getItem('mediorounds.v1')||'{}').badges, deck:JSON.parse(localStorage.getItem('mediorounds.v1')||'{}').deck?.length, figs:document.querySelectorAll('.fig img').length, figsDecoded:[...document.querySelectorAll('.fig img')].filter(i=>i.complete&&i.naturalWidth>0).length})`);
 counts.phases = [...seen].filter(x => x && !x.startsWith("shot"));
 console.log(JSON.stringify(counts), "errors:", errors);
 proc.kill(); process.exit(errors.length ? 1 : 0);
