@@ -35,6 +35,22 @@
   - `tests/engine.test.mjs`: all 3,000 cases complete, 0 errors, 10/10 routing checks. CI runs it before every deploy.
   - `tests/e2e.mjs`: a full case in headless Chromium with 0 console errors.
 
+## Built (v0.2, 2026-11-27)
+
+- **14,977 cases** in 15 wards (up to 1,000 each), plus a **1,000-case Multidisciplinary Ward**. The new
+  wards are ICU & Critical Care, Neurology & Neurosurgery, Physiotherapy & Rehab Centre, Clinical Pharmacology
+  & Toxicology, and Unique & Rare. Case files are split into shards of 100, each ward with its own index.
+- **Published figures** for 14,761 of the 15,977 case entries (including the multidisciplinary copies), loaded
+  from the PMC OA cloud bucket. 13,418 have captions paired one to one with their images.
+- **Team rounds:** each sentence is voiced by its specialist, and each specialist asks one question in a team
+  review. There are **1,142 pharmacist label cards**.
+- **Teaching:** learning objectives, 3-level hints, classmate nudges, an HOD round, a quiz with correction
+  (48,521 questions, all valid), a reflection step, XP, levels, badges, a streak, a journal, and a
+  spaced-repetition review deck.
+- **Voice:** barge-in, a separate voice per role, speed control, and the 5-second look-away rule (pause or keep
+  going), with an optional on-device camera mode.
+- **Phone layout:** the conversation gets most of the screen.
+
 ## Known limits (honest list)
 
 - Patient replies are third-person case-record sentences, not first-person speech, because rewriting them would
@@ -50,7 +66,7 @@
 
 | Step | What | Gate before calling it done |
 |---|---|---|
-| N1 | Scale the case bank (e.g. 1,000 per ward); split files so pages stay fast | Engine test 0 errors |
+| N1 | ~~Scale the case bank; split files so pages stay fast~~ Done in v0.2 (14,977 cases, shards of 100) | Engine test 0 errors: met |
 | N2 | Stage-sorting audit on a sample of 100 cases, rated by a human | Pre-registered accuracy bar |
 | N3 | Label-based dose check (DailyMed SPL data pre-built into static JSON) | Shown dose = label text 100% |
 | N4 | Faculty dashboard via a free backend (e.g. Supabase free tier), opt-in | Owner decision: accounts and data storage |
