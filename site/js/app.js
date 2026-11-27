@@ -2,7 +2,7 @@ import { CaseSession, route, terms } from "./engine.js";
 import { Voice } from "./voice.js";
 import { LANGS, langOf, translate, prepare, translatorSupported, numbersMatch } from "./i18n.js";
 import { TEAM, SPEAKERS, TEAM_Q, PEER_IDEAS, speakerFor, objectives, buildQuiz, judgeAnswer, reflect,
-  figureURL, figuresFor, resources } from "./teach.js";
+  figureURL, figuresFor, resources, doseChecks, DOSE_STATUS, imageQuestions } from "./teach.js";
 import * as store from "./store.js";
 
 const $ = (s, el = document) => el.querySelector(s);
@@ -94,7 +94,23 @@ async function translateUI() {
 function setBanner(text, kind = "info") { const b = $("#banner"); if (!b) return; b.textContent = text; b.hidden = !text; b.dataset.kind = kind; }
 
 // ---------------------------------------------------------------- data
-const getJSON = async u => (await fetch(u)).json();
+async function getJSON(u) {
+  let last;
+  for (let t = 0; t < 3; t++) {
+    try { const r = await fetch(u, { cache: t ? "reload" : "default" }); if (!r.ok) throw new Error(r.status + " " + u); return await r.json(); }
+    catch (e) { last = e; await new Promise(res => setTimeout(res, 600 * (t + 1))); }
+  }
+  throw last;
+}
+function loadFailed(what, retry) {
+  const msg = `Couldn't load ${what}. Check your internet connection and try again.`;
+  const main = $("main") || $("#app");
+  const box = document.createElement("div");
+  box.className = "loadfail card";
+  box.innerHTML = `<p><b>${esc(msg)}</b></p><div class="row"><button class="btn primary" id="retry">Retry</button><a class="btn" href="#/">Back to the wards</a></div>`;
+  if (main) main.prepend(box); else alert(msg);
+  const b = $("#retry"); if (b) b.onclick = () => { box.remove(); retry(); };
+}
 async function loadWards() { if (!app.wards) app.wards = await getJSON("data/wards.json"); return app.wards; }
 async function loadIndex(w) { if (!app.idx[w]) app.idx[w] = await getJSON(`data/cases/${w}/index.json`); return app.idx[w]; }
 async function loadShard(w, k) { const key = w + "/" + k; if (!app.shards[key]) app.shards[key] = await getJSON(`data/cases/${w}/${k}.json`); return app.shards[key]; }
@@ -177,7 +193,8 @@ function xp(n, why) {
 
 // ---------------------------------------------------------------- home
 async function renderHome() {
-  const w = await loadWards();
+  let w;
+  try { w = await loadWards(); } catch (e) { shell("<main></main>"); loadFailed("the ward list", renderHome); return; }
   const lv = store.level(db.xp), st = store.streak(db), due = store.dueCards(db).length;
   const prog = lv.next ? Math.round(100 * (db.xp - lv.floor) / (lv.next - lv.floor)) : 100;
   shell(`
@@ -223,22 +240,37 @@ async function renderHome() {
 }
 
 async function startWard(id, mode) {
-  const index = await loadIndex(id);
-  const c = pickCase(index, mode);
-  location.hash = `#/case/${id}/${c.id}`;
+  document.body.classList.add("busy");
+  try {
+    const index = await loadIndex(id);
+    const c = pickCase(index, mode);
+    const target = `#/case/${id}/${c.id}`;
+    if (location.hash === target) render(); else location.hash = target;
+  } catch (e) {
+    delete app.idx[id];
+    loadFailed("this ward", () => startWard(id, mode));
+  } finally { document.body.classList.remove("busy"); }
 }
 
 // ---------------------------------------------------------------- case
 async function renderCase(wardId, caseId) {
-  const w = await loadWards();
-  const index = await loadIndex(wardId);
-  const row = index.find(x => x.id === caseId);
-  if (!row) { location.hash = "#/"; return; }
-  const shard = await loadShard(wardId, row.k);
+  let w, index, row, shard;
+  try {
+    w = await loadWards();
+    index = await loadIndex(wardId);
+    row = index.find(x => x.id === caseId);
+    if (!row) { location.hash = "#/"; return; }
+    shard = await loadShard(wardId, row.k);
+  } catch (e) {
+    delete app.idx[wardId];
+    shell("<main></main>");
+    loadFailed("this case", () => renderCase(wardId, caseId));
+    return;
+  }
   const c = shard.find(x => x.id === caseId);
   const drugsReady = loadDrugs();                     // large file: load in the background, don't block the bedside
   drugsReady.then(() => { if (app.caseObj === c) updateNotes(); });
-  app.caseObj = c; app.ward = w.wards.find(x => x.id === wardId); app.shardTitles = shard.map(x => x.src.title);
+  app.caseObj = c; app.ward = w.wards.find(x => x.id === wardId); app.shardTitles = shard.map(x => x.src.title); app.shardCases = shard;
   app.sess = new CaseSession(c);
   Object.assign(app, { mode: null, teamQ: [], quiz: [], qi: 0, quizRight: 0, xpCase: 0, pharmSeen: new Set(), figShown: new Set(), lastActivity: Date.now(), lastNudge: Date.now() });
   const bed = 1 + (parseInt(c.id.replace(/\D/g, ""), 10) % 24);
@@ -326,20 +358,21 @@ const CHIPS = {
     ["Local exam", "Local examination"], ["Bloods", "Order CBC and biochemistry"], ["Imaging", "Order X-ray, CT, MRI and ultrasound"],
     ["Biopsy / culture", "Send biopsy, histopathology and culture"], ["Differentials", "My differentials are "], ["Diagnosis", "My diagnosis is "], ["Hint", "hint"]],
   plan: [["Plan", "My plan is "], ["Skip to rounds", "next"], ["Hint", "hint"]],
-  round: [["Next round", "next"], ["My decision", "I would "], ["Hint", "hint"]],
-  team: [["Skip", "skip"]],
-  quiz: [["A", "A"], ["B", "B"], ["C", "C"], ["D", "D"]],
-  reflect: [["Skip", "skip"]],
-  debrief: [],
+  round: [["Next round", "next"], ["My decision", "I would "], ["Hint", "hint"], ["Finish case", "finish case"]],
+  team: [["Skip", "skip"], ["Finish case", "finish case"]],
+  quiz: [["A", "A"], ["B", "B"], ["C", "C"], ["D", "D"], ["Finish case", "finish case"]],
+  reflect: [["Skip", "skip"], ["Finish case", "finish case"]],
+  debrief: [["Next patient", "next patient"], ["Finish & back to wards", "finish"]],
 };
 const PHASE_NAMES = { workup: "Work-up", plan: "Plan", round: "Ward rounds", team: "Team review", teach: "HOD & quiz", debrief: "Debrief" };
 function curPhase() { return app.mode === "team" ? "team" : (app.mode === "quiz" || app.mode === "reflect") ? "teach" : app.sess.finished ? "debrief" : app.sess.phase; }
 function updateChips() {
   const el = $("#chips"); if (!el) return;
-  const key = app.mode || app.sess.phase;
+  const key = app.sess.finished ? "debrief" : app.mode || app.sess.phase;
   el.innerHTML = (CHIPS[key] || []).map(([l, q]) => `<button class="chip" data-q="${esc(q)}" data-i18n>${esc(l)}</button>`).join("");
   el.querySelectorAll(".chip").forEach(b => b.addEventListener("click", () => {
     const q = b.dataset.q;
+    if (q === "next patient") { startWard(app.caseObj.ward === "mdt" ? "mdt" : app.ward.id, "any"); return; }
     if (q.endsWith(" ")) { const t = $("#text"); t.value = q; t.focus(); } else handleInput(q, false, true);
   }));
   const ph = ["workup", "plan", "round", "team", "teach", "debrief"], cur = curPhase();
@@ -362,6 +395,10 @@ function updateNotes() {
   if (s.ddx.length) html += `<h4 data-i18n>Your differentials</h4><ul>${s.ddx.map(d => `<li>${esc(d)}</li>`).join("")}</ul>`;
   if (s.dx) html += `<h4 data-i18n>Your diagnosis</h4><p>${esc(s.dx)}</p>`;
   if (app.pharmSeen.size) html += `<h4 data-i18n>Medicines (official label)</h4>` + [...app.pharmSeen].map(drugCard).join("");
+  const checks = app.drugs ? doseChecks(shown.map(e => e.t).join(" "), app.drugs, drugsIn) : [];
+  if (checks.length) html += `<h4 data-i18n>Dose check (case vs US label)</h4><ul class="dosecheck">${checks.map(x =>
+    `<li class="ds-${x.status}"><b>${DOSE_STATUS[x.status][0]} ${esc(x.drug)} ${esc(x.said)}</b><br><span class="small">${esc(DOSE_STATUS[x.status][1])}</span>${x.label ? `<details><summary class="small">Label dosing text</summary><p class="small">${esc(x.label)}</p></details>` : ""}</li>`).join("")}</ul>
+    <p class="muted small">"Appears in the label" means the amount is stated somewhere in the label's dosing section, not that it was right for this patient.</p>`;
   if (s.finished) html += `<h4 data-i18n>Learn more (free, open resources)</h4><ul class="res">${resources(c).map(([l, u]) => `<li><a target="_blank" rel="noopener" href="${esc(u)}">${esc(l)} ↗</a></li>`).join("")}</ul>`;
   el.innerHTML = html;
   wireFigs(el);
@@ -389,7 +426,7 @@ function drugCard(n) {
   const row = (k, l) => d[k] ? `<p><b>${l}:</b> ${esc(d[k])}</p>` : "";
   return `<details class="drug"><summary><b>${esc(n)}</b>${d.brand ? ` <span class="muted small">(${esc(d.brand)})</span>` : ""}${d.cls.length ? ` · <span class="small">${esc(d.cls.join(", "))}</span>` : ""}</summary>
     ${d.moa.length ? `<p><b>Mechanism class:</b> ${esc(d.moa.join(", "))}</p>` : ""}${row("mech", "Mechanism")}${row("ind", "Indications")}${row("box", "Boxed warning")}
-    ${row("ci", "Contraindications")}${row("ae", "Adverse reactions")}${row("ddi", "Interactions")}${row("preg", "Pregnancy")}
+    ${row("dose", "Label dosing (excerpt)")}${row("ci", "Contraindications")}${row("ae", "Adverse reactions")}${row("ddi", "Interactions")}${row("preg", "Pregnancy")}
     <p class="muted small">Quoted from the US label${d.route ? " (" + esc(d.route) + ")" : ""}, effective ${esc(d.eff)}. <a target="_blank" rel="noopener" href="https://dailymed.nlm.nih.gov/dailymed/lookup.cfm?setid=${esc(d.sid)}">Full label on DailyMed ↗</a> Doses in the case are what that team gave that patient; check your local formulary.</p></details>`;
 }
 
@@ -459,10 +496,15 @@ async function handleInput(raw, spoken, fromChip) {
   let en = raw;
   if (app.lang !== "en" && app.trOK && !fromChip) en = (await translate(raw, app.lang, "en")) || raw;
   youSaid(raw, en);
+  if (/^\s*(finish( the)?( case)?|end( the)? case|i'?m done|finish now)\s*[.!]?\s*$/i.test(en)) {
+    if (s.finished) { location.hash = "#/"; return; }
+    if (s.phase === "workup" || s.phase === "plan") { await say([{ role: "senior", en: "Commit a diagnosis and a plan first; then you can finish at any time." }]); return; }
+    app.mode = null; await finishCase(); return;
+  }
   if (app.mode === "team") return teamAnswer(en);
   if (app.mode === "quiz") return quizAnswer(en);
   if (app.mode === "reflect") return reflectAnswer(en);
-  if (s.finished) { await say([{ role: "senior", en: "This case is finished. Tap \"Next patient\" for a new one." }]); return; }
+  if (s.finished) { await say([{ role: "senior", en: "This case is finished. Tap \"Next patient\" for a new one, or \"Finish & back to wards\"." }]); return; }
   const intent = route(en, s.phase);
   const P = [];
   switch (intent) {
@@ -561,10 +603,14 @@ function roundParts(rr) {
   group(rr.items, "round").forEach((g, k) => P.push({ role: g.role, en: (k === 0 ? `Day ${rr.day}. ` : "") + join(g.items) }));
   if (app.set.pharm && app.drugs) {
     const fresh = drugsIn(join(rr.items)).filter(n => !app.pharmSeen.has(n)).slice(0, 2);
+    const checks = doseChecks(join(rr.items), app.drugs, drugsIn);
     for (const n of fresh) {
       app.pharmSeen.add(n);
       const d = app.drugs.cards[n];
-      const line = `${n}${d.cls.length ? ", " + d.cls[0] : ""}.${d.box ? " It carries a boxed warning." : ""} The label card is in your notes.`;
+      const dc = checks.filter(x => x.drug === n);
+      let line = `${n}${d.cls.length ? ", " + d.cls[0] : ""}.${d.box ? " It carries a boxed warning." : ""}`;
+      if (dc.length) line += ` Dose check: ${dc[0].said}. ${DOSE_STATUS[dc[0].status][1]}`;
+      line += " The label card is in your notes.";
       P.push({ role: "pharmacist", en: line, html: esc(line) + drugCard(n) });
     }
   }
@@ -624,20 +670,22 @@ async function startTeaching() {
   const P = [{ role: "hod", en: "Teaching round. The key points, from this case's own article:" }];
   if (c.pearls.length) c.pearls.forEach(p => P.push({ role: "hod", en: p }));
   else P.push({ role: "hod", en: "This report states no explicit teaching points; the full article is in your resources." });
-  const rest = c.figs ? c.figs.i.map((_, i) => i).filter(i => !app.figShown.has(i)) : [];
-  if (rest.length) { rest.forEach(i => app.figShown.add(i)); P.push({ role: "radiologist", en: "All the figures from the article.", html: "All the figures from the article." + figGrid(rest), speak: "All the figures from the article are on screen." }); }
   await say(P);
   await loadDrugs();
-  app.quiz = buildQuiz(s, app.drugs || null, app.shardTitles); app.qi = 0; app.quizRight = 0;
+  const imgQ = imageQuestions(c, app.shardCases || [], app.figShown);
+  const base = buildQuiz(s, app.drugs || null, app.shardTitles);
+  app.quiz = [...base.slice(0, 1), ...imgQ, ...base.slice(1)].slice(0, 6); app.qi = 0; app.quizRight = 0;
   if (!app.quiz.length) return startReflect();
-  await say([{ role: "senior", en: `Quick quiz: ${app.quiz.length} questions. Say or tap A, B, C or D.` }]);
+  const nImg = app.quiz.filter(q => q.img != null).length;
+  await say([{ role: "senior", en: `Quick quiz: ${app.quiz.length} questions${nImg ? `, including ${nImg} on the case's images` : ""}. Say or tap A, B, C or D.` }]);
   await askQuiz();
 }
 async function askQuiz() {
   const q = app.quiz[app.qi];
   if (!q) return startReflect();
   const opts = q.options.map((o, i) => `<button class="opt" data-opt="${LETTER[i]}"><b>${LETTER[i]}</b> ${esc(o)}</button>`).join("");
-  await say([{ role: "senior", en: `Question ${app.qi + 1}. ${q.stem}`, html: `<b>Question ${app.qi + 1}.</b> ${esc(q.stem)}<div class="opts">${opts}</div>`,
+  const img = q.img != null ? `<button class="qimg" data-fig="${q.img}"><img src="${figureURL(app.caseObj, q.img)}" alt="Figure from the case"></button>` : "";
+  await say([{ role: q.img != null ? "radiologist" : "senior", en: `Question ${app.qi + 1}. ${q.stem}`, html: `<b>Question ${app.qi + 1}.</b> ${esc(q.stem)}${img}<div class="opts">${opts}</div>`,
     speak: `Question ${app.qi + 1}. ${q.stem.replace("_____", "blank")}. ` + q.options.map((o, i) => `${LETTER[i]}: ${o}.`).join(" ") }]);
 }
 async function quizAnswer(en) {
@@ -646,7 +694,8 @@ async function quizAnswer(en) {
   if (!j.pick) { await say([{ role: "senior", en: "Say A, B, C or D, or tap an option." }]); return; }
   if (j.correct) { app.quizRight++; xp(10, "quiz"); await say([{ role: "senior", en: `Correct: ${q.answer}.` }]); }
   else {
-    store.addCard(db, { case: app.caseObj.id, ward: app.caseObj.ward, stem: q.stem, options: q.options, answer: q.answer, src: q.src });
+    store.addCard(db, { case: app.caseObj.id, ward: app.caseObj.ward, stem: q.stem, options: q.options, answer: q.answer, src: q.src,
+      img: q.img != null ? figureURL(app.caseObj, q.img) : null });
     await say([{ role: "hod", en: `Not quite. The answer is ${q.answer}. From the case: ${q.src}`, speak: `Not quite. The answer is ${q.answer}.` },
       { role: "senior", en: "I've added this to your review deck for tomorrow." }]);
   }
@@ -654,6 +703,9 @@ async function quizAnswer(en) {
   await askQuiz();
 }
 async function startReflect() {
+  const c = app.caseObj;
+  const rest = c.figs ? c.figs.i.map((_, i) => i).filter(i => !app.figShown.has(i)) : [];
+  if (rest.length) { rest.forEach(i => app.figShown.add(i)); await say([{ role: "radiologist", en: "All the figures from the article, with their captions.", html: "All the figures from the article, with their captions." + figGrid(rest), speak: "All the figures from the article are on screen." }]); updateNotes(); }
   app.mode = "reflect"; updateChips();
   await say([{ role: "hod", en: "Last question, and the most important one: what did you learn from this patient? Tell me in a sentence or two." }]);
 }
@@ -707,7 +759,7 @@ async function finishCase() {
   ${got.length ? `<p class="badges-new">${got.map(b => `<span class="badge">🏅 ${esc(b[0])}</span>`).join(" ")}</p>` : ""}
   <p class="muted small" data-i18n>Scores are automatic coverage counts, quiz results and your own ratings. They are a practice guide, not a validated assessment.</p>
   <p class="cite"><b data-i18n>Source</b> ${esc(src.authors)}. <a target="_blank" rel="noopener" href="https://pmc.ncbi.nlm.nih.gov/articles/${c.id}/">${esc(src.title)}</a>. ${esc(src.journal)} ${esc(src.year)}. ${src.doi ? `<a target="_blank" rel="noopener" href="https://doi.org/${esc(src.doi)}">doi:${esc(src.doi)}</a>` : ""} · ${esc(src.license)}. <span data-i18n>Case text reproduced verbatim and split into ward-round stages.</span></p>
-  <div class="row"><button class="btn primary" id="again" data-i18n>Next patient</button><a class="btn" href="#/review" data-i18n>Review deck</a><a class="btn" href="#/progress" data-i18n>My progress</a></div>`;
+  <div class="row"><button class="btn primary" id="again" data-i18n>Next patient</button><a class="btn finish" href="#/" data-i18n>Finish & back to wards</a><a class="btn" href="#/review" data-i18n>Review deck</a><a class="btn" href="#/progress" data-i18n>My progress</a></div>`;
   updateChips(); updateNotes();
   await say([{ role: "senior", en: `Well done. You earned ${app.xpCase} XP on this case. Your score card and free resources for further reading are below.` }], card);
 }
@@ -723,7 +775,7 @@ async function renderReview() {
   const show = () => {
     const el = $("#rv"); const c = due[i];
     if (!c) { el.innerHTML = `<p data-i18n>All done for today.</p><a class="btn primary" href="#/">Back to the wards</a>`; translateUI(); return; }
-    el.innerHTML = `<div class="card"><p class="muted small">${i + 1} / ${due.length}</p><p>${esc(c.stem)}</p><div class="opts">${c.options.map((o, k) => `<button class="opt" data-k="${k}"><b>${LETTER[k]}</b> ${esc(o)}</button>`).join("")}</div><div id="fb"></div></div>`;
+    el.innerHTML = `<div class="card"><p class="muted small">${i + 1} / ${due.length}</p><p>${esc(c.stem)}</p>${c.img ? `<img class="rvimg" src="${esc(c.img)}" alt="Figure">` : ""}<div class="opts">${c.options.map((o, k) => `<button class="opt" data-k="${k}"><b>${LETTER[k]}</b> ${esc(o)}</button>`).join("")}</div><div id="fb"></div></div>`;
     el.querySelectorAll(".opt").forEach(b => b.onclick = () => {
       const ok = c.options[+b.dataset.k] === c.answer;
       store.reviewCard(db, c.key, ok); if (ok) xp(5, "review");

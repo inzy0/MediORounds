@@ -189,14 +189,81 @@ def step2(aliases: Path | None) -> None:
     print("drug cards kept", len(keep), "aliases", len(used_alias))
 
 
+# ---------------- dose check data (from the label's DOSAGE AND ADMINISTRATION section) ----------------
+DOSE_RX = re.compile(r"(\d+(?:\.\d+)?)(?:\s*(?:to|-|–|or)\s*(\d+(?:\.\d+)?))?\s*"
+                     r"(mg|g|gram|grams|milligrams?|mcg|µg|micrograms?|units?|IU|mL|mEq|mmol)\b"
+                     r"(?:\s*/\s*(kg|m2|m\^2|m²))?", re.I)
+
+
+def dose_key(unit: str, per: str | None):
+    u = unit.lower()
+    factor, base = 1.0, u
+    if u in ("g", "gram", "grams"):
+        factor, base = 1000.0, "mg"
+    elif u in ("mg", "milligram", "milligrams"):
+        base = "mg"
+    elif u in ("mcg", "µg", "microgram", "micrograms"):
+        factor, base = 0.001, "mg"
+    elif u in ("unit", "units", "iu"):
+        base = "units"
+    elif u == "ml":
+        base = "mL"
+    elif u == "meq":
+        base = "mEq"
+    if per:
+        p = per.lower().replace("^", "").replace("²", "2")
+        base += "/" + ("kg" if p == "kg" else "m2")
+    return factor, base
+
+
+def label_doses(da: str) -> list:
+    out = set()
+    for m in DOSE_RX.finditer(da):
+        f, key = dose_key(m.group(3), m.group(4))
+        lo = float(m.group(1)) * f
+        hi = float(m.group(2)) * f if m.group(2) else lo
+        if hi < lo:
+            lo, hi = hi, lo
+        out.add((round(lo, 4), round(hi, 4), key))
+    return sorted(out)[:80]
+
+
+def step_dose(dosing: Path) -> None:
+    path = SITE / "drugs.json"
+    d = json.loads(path.read_text(encoding="utf-8"))
+    con = sqlite3.connect(dosing)
+    n = 0
+    for name, card in d["cards"].items():
+        row = con.execute("select da from label where set_id=?", (card["sid"],)).fetchone()
+        if not row or not row[0]:
+            row = con.execute("select da from label where base=? and product_type='HUMAN PRESCRIPTION DRUG' and da<>'' "
+                              "order by effective_time desc limit 1", (name,)).fetchone()
+        if not row or not row[0]:
+            continue
+        da = clean_section(row[0], r"dosage (and|&) administration")
+        doses = label_doses(da)
+        if not doses:
+            continue
+        # verbatim excerpt: first sentences that state an amount, preferring adult / usual dosing
+        ss = [s for s in sentences(da) if DOSE_RX.search(s)]
+        pref = [s for s in ss if re.search(r"\b(adult|usual|recommended)\b", s, re.I)] or ss
+        card["dose"] = (" ".join(pref[:2]))[:500]
+        card["dn"] = [[lo, hi, k] for lo, hi, k in doses]
+        n += 1
+    path.write_text(json.dumps(d, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    print("cards with dose data", n, "of", len(d["cards"]))
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--labels", type=Path)
     ap.add_argument("--dosing", type=Path)
     ap.add_argument("--aliases", type=Path)
-    ap.add_argument("--step", choices=["1", "2", "both"], default="both")
+    ap.add_argument("--step", choices=["1", "2", "both", "dose"], default="both")
     a = ap.parse_args()
     if a.step in ("1", "both"):
         step1(a.labels, a.dosing)
     if a.step in ("2", "both"):
         step2(a.aliases)
+    if a.step in ("2", "both", "dose"):
+        step_dose(a.dosing or Path(r"label_dosing.sqlite"))

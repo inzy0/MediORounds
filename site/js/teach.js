@@ -187,3 +187,86 @@ export function resources(c) {
   if (c.figs) R.splice(1, 0, ["Article PDF (PMC open data)", `https://pmc-oa-opendata.s3.amazonaws.com/${c.figs.v}/${c.figs.v}.pdf`]);
   return R;
 }
+
+// ---------------- dose check: case dose vs the official label's dosing text ----------------
+// Honest by design: "appears in the label's dosing text" is NOT "correct for this patient"; labels state many
+// amounts (by indication, age, weight, renal function) and are US labels.
+const DOSE_RX = /(\d+(?:\.\d+)?)(?:\s*(?:to|-|–|or)\s*(\d+(?:\.\d+)?))?\s*(mg|g|grams?|milligrams?|mcg|µg|micrograms?|units?|IU|mL|mEq|mmol)\b(?:\s*\/\s*(kg|m2|m\^2|m²))?/gi;
+function doseKey(unit, per) {
+  const u = unit.toLowerCase(); let f = 1, b = u;
+  if (["g", "gram", "grams"].includes(u)) { f = 1000; b = "mg"; }
+  else if (["mg", "milligram", "milligrams"].includes(u)) b = "mg";
+  else if (["mcg", "µg", "microgram", "micrograms"].includes(u)) { f = 0.001; b = "mg"; }
+  else if (["unit", "units", "iu"].includes(u)) b = "units";
+  else if (u === "ml") b = "mL"; else if (u === "meq") b = "mEq";
+  if (per) b += "/" + (per.toLowerCase() === "kg" ? "kg" : "m2");
+  return [f, b];
+}
+export function doseChecks(text, drugs, findDrugs) {
+  if (!drugs) return [];
+  const out = [];
+  const low = text.toLowerCase();
+  for (const name of findDrugs(text)) {
+    const card = drugs.cards[name]; if (!card) continue;
+    const alias = Object.entries(drugs.aliases || {}).filter(([, v]) => v === name).map(([k]) => k);
+    let at = -1;
+    for (const n of [name, ...alias]) { const i = low.indexOf(n); if (i >= 0 && (at < 0 || i < at)) at = i; }
+    if (at < 0) continue;
+    const win = text.slice(at, at + 90).split(/[.;](\s|$)/)[0];
+    for (const m of win.matchAll(DOSE_RX)) {
+      const [f, key] = doseKey(m[3], m[4]);
+      const v = +m[1] * f, v2 = m[2] ? +m[2] * f : v;
+      let status = "nolabel";
+      if (card.dn && card.dn.length) {
+        const same = card.dn.filter(d => d[2] === key);
+        if (same.some(d => v >= d[0] - 1e-9 && v2 <= d[1] + 1e-9 || Math.abs(d[0] - v) < 1e-9)) status = "in";
+        else if (!same.length && card.dn.some(d => d[2].startsWith(key.split("/")[0] + "/"))) status = "weight";
+        else status = "out";
+      }
+      out.push({ drug: name, said: m[0], status, label: card.dose || "", sid: card.sid });
+    }
+  }
+  return out;
+}
+export const DOSE_STATUS = {
+  in: ["✓", "This amount appears in the US label's dosing text."],
+  out: ["⚠", "This amount does not appear in the US label's dosing text. It may be weight-based, for a different indication or country, or off-label. Check the label and your formulary."],
+  weight: ["≈", "The label doses this medicine by body weight or surface area, so a fixed amount can't be compared directly."],
+  nolabel: ["–", "No dosing text was available from the label to compare."],
+};
+
+// ---------------- image questions (published figures with exactly paired captions) ----------------
+const MODALITY = { "X-ray": /x-?ray|radiograph/i, "CT": /\bct\b|computed tomograph/i, "MRI": /\bmri\b|magnetic resonance/i,
+  "Ultrasound": /ultraso|sonograph|doppler/i, "Histology": /histolog|histopatholog|h&e|haematoxylin|hematoxylin|immunohisto|magnification/i,
+  "Endoscopy": /endoscop|colonoscop|bronchoscop|gastroscop/i, "Clinical photograph": /photograph|clinical (image|picture|appearance)/i,
+  "Fundus / eye imaging": /fundus|slit[- ]lamp|optical coherence|\boct\b/i, "ECG": /\becg\b|electrocardiogra/i,
+  "Angiography": /angiogra/i, "Echocardiography": /echocardiogra/i };
+function modalityOf(cap) {
+  const hits = Object.keys(MODALITY).filter(k => MODALITY[k].test(cap));
+  return hits.length === 1 ? hits[0] : null;                   // only unambiguous captions
+}
+export function imageQuestions(c, otherCases, exclude = new Set()) {
+  if (!c.figs || !c.figs.c.length) return [];
+  seeded(c.id + "img");
+  const qs = [];
+  let cand = c.figs.c.map((cap, i) => ({ i, cap, mod: modalityOf(cap) })).filter(x => x.mod && x.cap.length > 30);
+  if (!cand.length) return [];
+  const unseen = cand.filter(x => !exclude.has(x.i));
+  if (unseen.length) cand = unseen;                            // prefer a figure the student hasn't seen captioned
+  const pick = shuffle(cand)[0];
+  // 1) what kind of image is this?
+  const mods = shuffle(Object.keys(MODALITY).filter(k => k !== pick.mod)).slice(0, 3);
+  qs.push({ kind: "img-mod", img: pick.i, stem: "Image question: what kind of image is this?", answer: pick.mod,
+    options: shuffle([pick.mod, ...mods]), src: pick.cap });
+  // 2) which description matches this image? (real captions of the same kind from other cases)
+  const pool = [];
+  for (const o of otherCases) {
+    if (o.id === c.id || !o.figs || !o.figs.c.length) continue;
+    for (const cap of o.figs.c) if (modalityOf(cap) === pick.mod && cap.length > 30) pool.push(cap);
+  }
+  const short = s => s.length > 170 ? s.slice(0, 167) + "…" : s;
+  const distract = shuffle([...new Set(pool.map(short))]).filter(s => s !== short(pick.cap)).slice(0, 3);
+  if (distract.length === 3) qs.push({ kind: "img-read", img: pick.i, stem: "Image interpretation: which description matches this image?",
+    answer: short(pick.cap), options: shuffle([short(pick.cap), ...distract]), src: pick.cap });
+  return qs;
+}
